@@ -79,6 +79,25 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// ADD THIS INTERCEPTOR:
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    if (err.response?.status === 403) {
+      console.log('🔄 Token expired, refreshing...');
+      // Delete bad token file
+      try { fs.unlinkSync(TOKEN_FILE); } catch {}
+      // Try fresh login
+      const newToken = await loginAndGetToken();
+      if (newToken) {
+        err.config.headers.Authorization = `Bearer ${newToken}`;
+        return api(err.config);
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 // ========== FETCH ==========
 async function fetchAllStocks() {
   const cached = getCache('all');
