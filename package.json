@@ -1,0 +1,16 @@
+{
+  "name": "stockintel-app",
+  "version": "1.0.0",
+  "description": "PSX StockIntel Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "latest",
+    "cors": "latest",
+    "axios": "latest",
+    "dotenv": "latest"
+  }
+}
