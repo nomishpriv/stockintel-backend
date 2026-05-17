@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const si = require('../services/stockIntelService');
 const smcService = require('../services/smcService');
+const predictService = require('../services/predictService');
 
 
 // Get all stocks
@@ -106,6 +107,53 @@ router.get('/smc/:symbol', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// Create prediction for a stock
+router.get('/predict/:symbol', async (req, res) => {
+  try {
+    const stock = await si.getStock(req.params.symbol.toUpperCase());
+    if (!stock) return res.status(404).json({ success: false, error: 'Not found' });
+    const prediction = predictService.createPrediction(stock);
+    res.json({ success: true, ...prediction });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Check predictions for a stock
+router.get('/predict/check/:symbol', async (req, res) => {
+  try {
+    const stock = await si.getStock(req.params.symbol.toUpperCase());
+    if (!stock) return res.status(404).json({ success: false, error: 'Not found' });
+    const result = predictService.checkPrediction(
+      stock.symbol, stock.price, stock.high, stock.low
+    );
+    res.json({ success: true, ...result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Get accuracy summary
+router.get('/predict/accuracy/:symbol', async (req, res) => {
+  try {
+    const summary = predictService.getAccuracySummary(req.params.symbol.toUpperCase());
+    res.json({ success: true, ...summary });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Get all accuracies
+router.get('/predict/accuracy', async (req, res) => {
+  try {
+    const results = predictService.getAllAccuracies();
+    res.json({ success: true, data: results });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 
 // Clear cache
 router.post('/cache/clear', async (req, res) => {
