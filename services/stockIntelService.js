@@ -27,7 +27,7 @@ function loadToken() {
       const data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
       if (data.expiry > Date.now()) return data.token;
     }
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -35,27 +35,87 @@ function saveToken(token) {
   fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, expiry: Date.now() + 3500000 }));
 }
 
-async function loginAndGetToken() {
-  try {
-    console.log('🔑 Auto-login...');
-    const { data } = await axios.post(`${BASE}/login`, {
-      phone: PHONE, password: PASSWORD,
-      device: { id: DEVICE_ID, name: 'Chrome', os: 'windows', type: 'desktop' }
-    }, { timeout: 10000 });
+let loginPromise = null;
 
-    const token = data?.data?.access_token;
-    if (token) {
-      saveToken(token);
-      console.log('✅ Auto-login success');
-      return token;
+async function loginAndGetToken() {
+  // If already logging in, wait for that one
+  if (loginPromise) return loginPromise;
+
+  loginPromise = (async () => {
+    try {
+      console.log('🔑 Auto-login...');
+      const { data } = await axios.post(`${BASE}/login`, {
+        phone: PHONE, password: PASSWORD,
+        device: { id: DEVICE_ID, name: 'Chrome', os: 'windows', type: 'desktop' }
+      }, { timeout: 10000 });
+
+      const token = data?.data?.access_token;
+      if (token) {
+        saveToken(token);
+        console.log('✅ Auto-login success');
+        return token;
+      }
+      return null;
+    } catch (e) {
+      if (e.response?.status === 429) {
+        console.log('⏳ Rate limited — using manual token');
+      }
+      return null;
+    } finally {
+      loginPromise = null;
     }
-    return null;
-  } catch (e) {
-    if (e.response?.status === 429) {
-      console.log('⏳ Rate limited — using manual token');
+  })();
+
+  return loginPromise;
+}
+
+let fetchPromise = null;
+
+async function fetchAllStocks() {
+  const cached = getCache('all');
+  if (cached) return cached;
+
+  if (fetchPromise) return fetchPromise;
+
+  fetchPromise = (async () => {
+    console.log('📡 Fetching...');
+    try {
+      const { data } = await api.get('/market');
+      const raw = data?.data?.eq;
+      if (!raw) return [];
+
+      const stocks = Object.entries(raw)
+        .filter(([sym, s]) => {
+          if (/R$|PREF|ETF|FUT|-/.test(sym)) return false;
+          if (s.st !== 1 || !s.c || +s.c <= 0) return false;
+          return true;
+        })
+        .map(([sym, s]) => ({
+          symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
+          volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
+          prevClose: +s.ldcp, prevVolume: +s.ldcv, rsi: +s.rsi,
+          upperCircuit: +s.uc, lowerCircuit: +s.lc,
+          pivot: +s.pp?.pp, r1: +s.pp?.r1, r2: +s.pp?.r2, s1: +s.pp?.s1, s2: +s.pp?.s2,
+          perf1w: +s.p1w, perf1m: +s.p1m, perf3m: +s.p3m, perf1y: +s.p1y, perfYtd: +s.pytd,
+          eps: +s.eps, dps: +s.dps, pe: +s.pr, divYield: +s.di,
+          volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
+          beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
+          status: 'ACTIVE', lastUpdate: s.d,
+          signal: (+s.pch || 0) > 0.01 ? 'BUY' : (+s.pch || 0) < -0.01 ? 'SELL' : 'NEUTRAL'
+        }));
+
+      console.log(`✅ ${stocks.length} stocks`);
+      setCache('all', stocks);
+      return stocks;
+    } catch (e) {
+      console.error('❌ Fetch failed:', e.response?.status || e.message);
+      return [];
+    } finally {
+      fetchPromise = null;
     }
-    return null;
-  }
+  })();
+
+  return fetchPromise;
 }
 
 async function getToken() {
@@ -86,7 +146,7 @@ api.interceptors.response.use(
     if (err.response?.status === 403) {
       console.log('🔄 Token expired, refreshing...');
       // Delete bad token file
-      try { fs.unlinkSync(TOKEN_FILE); } catch {}
+      try { fs.unlinkSync(TOKEN_FILE); } catch { }
       // Try fresh login
       const newToken = await loginAndGetToken();
       if (newToken) {
@@ -117,7 +177,7 @@ async function fetchAllStocks() {
       })
       .map(([sym, s]) => ({
         symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
-        volume: +s.v, change: +s.ch, changePercent: +((s.pch||0)*100).toFixed(2),
+        volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
         prevClose: +s.ldcp, prevVolume: +s.ldcv, rsi: +s.rsi,
         upperCircuit: +s.uc, lowerCircuit: +s.lc,
         pivot: +s.pp?.pp, r1: +s.pp?.r1, r2: +s.pp?.r2, s1: +s.pp?.s1, s2: +s.pp?.s2,
@@ -126,11 +186,17 @@ async function fetchAllStocks() {
         volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
         beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
         status: 'ACTIVE', lastUpdate: s.d,
-        signal: (+s.pch||0)>0.01?'BUY':(+s.pch||0)<-0.01?'SELL':'NEUTRAL'
+        signal: (+s.pch || 0) > 0.01 ? 'BUY' : (+s.pch || 0) < -0.01 ? 'SELL' : 'NEUTRAL'
       }));
 
     console.log(`✅ ${stocks.length} stocks`);
     setCache('all', stocks);
+    // Auto-predict & check
+    const predictService = require('./predictService');
+    predictService.autoPredict(stocks);
+    for (const stock of stocks) {
+      try { predictService.checkPrediction(stock.symbol, stock.price, stock.high, stock.low); } catch { }
+    }
     return stocks;
   } catch (e) {
     console.error('❌ Fetch failed:', e.response?.status || e.message);

@@ -154,6 +154,116 @@ router.get('/predict/accuracy', async (req, res) => {
   }
 });
 
+// GET /api/stats/daily — Today's signal performance
+router.get('/stats/daily', async (req, res) => {
+  try {
+    const predictions = predictService.getAllAccuracies();
+    const all = await si.fetchAllStocks();
+    
+    // Count today's signals
+    const buySignals = all.filter(s => s.signal === 'BUY').length;
+    const sellSignals = all.filter(s => s.signal === 'SELL').length;
+    const highVolStocks = all.filter(s => s.volume > s.volAvg10d * 1.5).length;
+    
+    // Count successful predictions
+    const totalPivot = predictions.reduce((sum, p) => sum + (p.pivotAccuracy || 0), 0);
+    const totalATR = predictions.reduce((sum, p) => sum + (p.atrAccuracy || 0), 0);
+    const count = predictions.length || 1;
+    
+    res.json({
+      success: true,
+      data: {
+        totalStocks: all.length,
+        buySignals,
+        sellSignals,
+        highVolStocks,
+        avgPivotAccuracy: +(totalPivot / count).toFixed(1),
+        avgATRAccuracy: +(totalATR / count).toFixed(1),
+        predictionsTracked: predictions.length
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/predict/batch — Create predictions for top opportunities
+router.post('/predict/batch', async (req, res) => {
+  try {
+    const opps = await si.getOpportunities(10);
+    const results = [];
+    
+    for (const opp of opps) {
+      const prediction = predictService.createPrediction(opp);
+      results.push({ symbol: opp.symbol, ...prediction });
+    }
+    
+    res.json({ success: true, created: results.length, data: results });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/stats/daily-report — Full daily performance report
+router.get('/stats/daily-report', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const PREDICT_FILE = path.join(__dirname, '..', '.predictions.json');
+    
+    let allPredictions = {};
+    try {
+      if (fs.existsSync(PREDICT_FILE)) {
+        allPredictions = JSON.parse(fs.readFileSync(PREDICT_FILE, 'utf8'));
+      }
+    } catch {}
+
+    const report = {
+      date: new Date().toISOString().split('T')[0],
+      totalStocks: Object.keys(allPredictions).length,
+      details: []
+    };
+
+    let totalPivotWins = 0, totalPivotLosses = 0;
+    let totalATRWins = 0, totalATRLosses = 0;
+
+    for (const [symbol, predictions] of Object.entries(allPredictions)) {
+      const completed = predictions.filter(p => p.checked);
+      const pivotWins = completed.filter(p => p.pivot?.result === 'WIN').length;
+      const pivotLosses = completed.filter(p => p.pivot?.result === 'LOSS').length;
+      const atrWins = completed.filter(p => p.atr?.result === 'WIN').length;
+      const atrLosses = completed.filter(p => p.atr?.result === 'LOSS').length;
+
+      totalPivotWins += pivotWins;
+      totalPivotLosses += pivotLosses;
+      totalATRWins += atrWins;
+      totalATRLosses += atrLosses;
+
+      if (completed.length > 0) {
+        report.details.push({
+          symbol,
+          predictions: completed.length,
+          pivot: { wins: pivotWins, losses: pivotLosses, accuracy: pivotWins + pivotLosses > 0 ? +((pivotWins / (pivotWins + pivotLosses)) * 100).toFixed(0) : 0 },
+          atr: { wins: atrWins, losses: atrLosses, accuracy: atrWins + atrLosses > 0 ? +((atrWins / (atrWins + atrLosses)) * 100).toFixed(0) : 0 }
+        });
+      }
+    }
+
+    report.summary = {
+      totalPredictions: totalPivotWins + totalPivotLosses + totalATRWins + totalATRLosses,
+      pivot: { wins: totalPivotWins, losses: totalPivotLosses, accuracy: totalPivotWins + totalPivotLosses > 0 ? +((totalPivotWins / (totalPivotWins + totalPivotLosses)) * 100).toFixed(0) : 0 },
+      atr: { wins: totalATRWins, losses: totalATRLosses, accuracy: totalATRWins + totalATRLosses > 0 ? +((totalATRWins / (totalATRWins + totalATRLosses)) * 100).toFixed(0) : 0 },
+      bestMethod: totalPivotWins + totalATRWins > 0
+        ? (totalPivotWins > totalATRWins ? 'PIVOT' : 'ATR')
+        : 'NONE'
+    };
+
+    res.json({ success: true, report });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 
 // Clear cache
 router.post('/cache/clear', async (req, res) => {
