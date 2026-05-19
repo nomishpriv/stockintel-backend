@@ -3,6 +3,7 @@ const router = express.Router();
 const si = require('../services/stockIntelService');
 const smcService = require('../services/smcService');
 const predictService = require('../services/predictService');
+const newsService = require('../services/newsService');
 
 
 // Get all stocks
@@ -259,6 +260,26 @@ router.get('/stats/daily-report', async (req, res) => {
     };
 
     res.json({ success: true, report });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+router.get('/news/impact', async (req, res) => {
+  try {
+    const { forceRefresh } = req.query;
+    const data = await newsService.getNewsImpact({ forceRefresh: forceRefresh === 'true' });
+    res.json({ success: true, ...data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Quick signal for dashboard widget
+router.get('/news/signal', async (req, res) => {
+  try {
+    const data = await newsService.getQuickSignal();
+    res.json({ success: true, ...data });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }

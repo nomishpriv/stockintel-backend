@@ -8,9 +8,10 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "latest",
-    "cors": "latest",
     "axios": "latest",
-    "dotenv": "latest"
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "groq-sdk": "^1.2.0"
   }
 }
