@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PREDICT_FILE = path.join(__dirname, '..', '.predictions.json');
+const STATE_FILE = path.join(__dirname, '..', '.predict-state.json');
 
 // ========== LOAD / SAVE ==========
 function loadPredictions() {
@@ -17,35 +18,53 @@ function savePredictions(data) {
   fs.writeFileSync(PREDICT_FILE, JSON.stringify(data, null, 2));
 }
 
+// FIX 1: Persist lastAutoPredict so server restarts don't cause duplicate predictions
+function loadState() {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    }
+  } catch {}
+  return { lastAutoPredict: 0 };
+}
+
+function saveState(state) {
+  try {
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {}
+}
+
+// FIX 2: Use PKT timezone (UTC+5) for PSX market hours
 function isMarketOpen() {
   const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const day = now.getDay();
-  
-  if (day >= 1 && day <= 4) {
-    const time = hour + minute / 60;
-    return time >= 9.5 && time <= 15.5;
-  }
-  if (day === 5) {
-    const time = hour + minute / 60;
-    return time >= 9.5 && time <= 12.5;
-  }
-  return false;
+  // Convert to PKT (UTC+5)
+  const pkt = new Date(now.getTime() + (5 * 60 * 60 * 1000));
+  const hour = pkt.getUTCHours();
+  const minute = pkt.getUTCMinutes();
+  const day = pkt.getUTCDay(); // 0=Sun, 1=Mon ... 5=Fri, 6=Sat
+
+  if (day === 0 || day === 6) return false; // Weekend
+
+  const time = hour + minute / 60;
+  return time >= 9.5 && time <= 15.5; // 9:30 AM – 3:30 PM PKT
 }
 
 // ========== TOP STOCKS FOR AUTO-PREDICT ==========
 const TOP_SYMBOLS = ['FFC', 'LUCK', 'OGDC', 'MEBL', 'PPL', 'EFERT', 'HUBC', 'ENGRO', 'POL', 'MARI', 'SEARL', 'DGKC', 'MLCF'];
-let lastAutoPredict = 0;
 
 // ========== AUTO-PREDICT FUNCTION ==========
 function autoPredict(stocks) {
   if (!isMarketOpen()) return [];
-  if (Date.now() - lastAutoPredict < 900000) return []; // Every 15 minutes
-  
-  lastAutoPredict = Date.now();
+
+  // FIX 3: Load lastAutoPredict from disk so it survives restarts
+  const state = loadState();
+  if (Date.now() - state.lastAutoPredict < 900000) return []; // Every 15 minutes
+
+  state.lastAutoPredict = Date.now();
+  saveState(state);
+
   const results = [];
-  
+
   for (const stock of stocks) {
     if (TOP_SYMBOLS.includes(stock.symbol)) {
       const result = createPrediction(stock);
@@ -54,7 +73,7 @@ function autoPredict(stocks) {
       }
     }
   }
-  
+
   if (results.length > 0) {
     console.log('🤖 Auto-predicted:', results.join(', '));
   }
@@ -66,7 +85,7 @@ function createPrediction(stock) {
   if (!isMarketOpen()) {
     return { skipped: true, reason: 'Market is closed' };
   }
-  
+
   const price = stock.price || 0;
   const atr = stock.atr || (price * 0.01);
   const volumeOk = stock.volume > 10000;
@@ -82,23 +101,51 @@ function createPrediction(stock) {
 
   const all = loadPredictions();
   const existing = all[stock.symbol] || [];
+
+  // FIX 4: Skip if a prediction with the same entry price already exists (deduplicates restart-spam)
+  const samePrice = existing.filter(p => !p.checked && p.pivot.entry === price);
+  if (samePrice.length > 0) {
+    return { skipped: true, reason: 'Active prediction at same price already exists' };
+  }
+
+  // FIX 5: 5-minute recency guard still applies
   const recent = existing.filter(p => {
     const created = new Date(p.pivot.createdAt).getTime();
     return (Date.now() - created) < 300000;
   });
-  
   if (recent.length > 0) {
     return { skipped: true, reason: 'Already predicted recently' };
   }
+
+  // FIX 6: Validate pivot target is above entry price (was allowing target < entry)
+  let pivotTarget = r1 > price ? r1 : r2;
+  if (pivotTarget <= price) {
+    // No valid resistance above price — skip pivot or use ATR-based target
+    pivotTarget = +(price + atr * 1.5).toFixed(2);
+  }
+
+    // FIX 10: Skip if target is too close (less than 0.15% away)
+  const targetDistance = ((pivotTarget - price) / price) * 100;
+  if (targetDistance < 0.15) {
+    return { skipped: true, reason: `Target too close (${targetDistance.toFixed(2)}%) — not worth trading` };
+  }
+
+  let pivotStop = s1 < price ? s1 : s2;
+  if (pivotStop >= price) {
+    pivotStop = +(price - atr * 1.5).toFixed(2);
+  }
+
+  const pivotConfidence = r1 > price ? 70 : 50;
 
   const predictions = {
     pivot: {
       method: 'PIVOT',
       entry: price,
-      target: r1 > price ? r1 : r2,
-      stopLoss: s1 < price ? s1 : s2,
-      confidence: r1 > price ? 70 : 50,
-      createdAt: new Date().toISOString()
+      target: pivotTarget,
+      stopLoss: pivotStop,
+      confidence: pivotConfidence,
+      createdAt: new Date().toISOString(),
+      checked: false   // FIX 7: explicitly initialize
     },
     atr: {
       method: 'ATR',
@@ -106,7 +153,8 @@ function createPrediction(stock) {
       target: +(price + atr * 2).toFixed(2),
       stopLoss: +(price - atr * 1.5).toFixed(2),
       confidence: 65,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      checked: false   // FIX 7: explicitly initialize
     }
   };
 
@@ -117,9 +165,9 @@ function createPrediction(stock) {
     result: null,
     hitAt: null
   });
-  
+
   if (all[stock.symbol].length > 50) all[stock.symbol] = all[stock.symbol].slice(-50);
-  
+
   savePredictions(all);
   return predictions;
 }
@@ -132,6 +180,10 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
 
   for (const pred of stockPreds) {
     if (pred.checked) continue;
+
+    // FIX 8: Guard against resolving predictions that are less than 60 seconds old
+    const age = Date.now() - new Date(pred.pivot.createdAt).getTime();
+    if (age < 60000) continue;
 
     if (!pred.pivot.checked) {
       if (currentHigh >= pred.pivot.target) {
@@ -170,7 +222,7 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
 
   const active = stockPreds.filter(p => !p.checked);
   const completed = stockPreds.filter(p => p.checked);
-  
+
   const pivotWins = completed.filter(p => p.pivot?.result === 'WIN').length;
   const pivotTotal = completed.filter(p => p.pivot?.checked).length;
   const atrWins = completed.filter(p => p.atr?.result === 'WIN').length;
@@ -191,20 +243,35 @@ function getAccuracySummary(symbol) {
   const all = loadPredictions();
   const stockPreds = all[symbol] || [];
   const completed = stockPreds.filter(p => p.checked);
-  
+
   const pivotWins = completed.filter(p => p.pivot?.result === 'WIN').length;
   const pivotTotal = completed.filter(p => p.pivot?.checked).length;
   const atrWins = completed.filter(p => p.atr?.result === 'WIN').length;
   const atrTotal = completed.filter(p => p.atr?.checked).length;
 
+  const pivotAccuracy = pivotTotal > 0 ? +((pivotWins / pivotTotal) * 100).toFixed(0) : null;
+  const atrAccuracy = atrTotal > 0 ? +((atrWins / atrTotal) * 100).toFixed(0) : null;
+  const bestMethod = pivotTotal >= 3 && atrTotal >= 3
+    ? (pivotWins / pivotTotal >= atrWins / atrTotal ? 'PIVOT' : 'ATR')
+    : null;
+
+  // FIX 9: Populate recommendation instead of leaving it null
+  let recommendation = null;
+  if (bestMethod) {
+    const acc = bestMethod === 'PIVOT' ? pivotAccuracy : atrAccuracy;
+    if (acc >= 60) recommendation = `Use ${bestMethod} — strong accuracy (${acc}%)`;
+    else if (acc >= 40) recommendation = `${bestMethod} shows moderate accuracy (${acc}%) — trade with caution`;
+    else recommendation = `Both methods underperforming — avoid auto-trading ${symbol}`;
+  }
+
   return {
     symbol,
     totalPredictions: stockPreds.length,
     totalCompleted: completed.length,
-    pivotAccuracy: pivotTotal > 0 ? +((pivotWins / pivotTotal) * 100).toFixed(0) : null,
-    atrAccuracy: atrTotal > 0 ? +((atrWins / atrTotal) * 100).toFixed(0) : null,
-    bestMethod: pivotTotal >= 3 && atrTotal >= 3 ? (pivotWins / pivotTotal >= atrWins / atrTotal ? 'PIVOT' : 'ATR') : null,
-    recommendation: null
+    pivotAccuracy,
+    atrAccuracy,
+    bestMethod,
+    recommendation
   };
 }
 
