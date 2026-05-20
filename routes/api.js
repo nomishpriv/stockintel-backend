@@ -285,6 +285,25 @@ router.get('/news/signal', async (req, res) => {
   }
 });
 
+router.get('/kse100/volume', async (req, res) => {
+  try {
+    const data = await si.getKSE100Volume();
+    if (!data) return res.status(404).json({ success: false, error: 'KSE100 data not available' });
+    res.json({ success: true, ...data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+router.get('/kse100/volume-speed', async (req, res) => {
+  try {
+    const data = await si.getVolumeSpeed();
+    if (!data) return res.status(404).json({ success: false, error: 'Data not available' });
+    res.json({ success: true, ...data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 
 // Clear cache
 router.post('/cache/clear', async (req, res) => {
