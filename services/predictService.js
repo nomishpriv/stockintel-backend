@@ -103,9 +103,9 @@ function createPrediction(stock) {
   const existing = all[stock.symbol] || [];
 
   // FIX 4: Skip if a prediction with the same entry price already exists (deduplicates restart-spam)
-  const samePrice = existing.filter(p => !p.checked && p.pivot.entry === price);
+  const samePrice = existing.filter(p => !p.checked && Math.abs(p.pivot.entry - price) / price < 0.01);
   if (samePrice.length > 0) {
-    return { skipped: true, reason: 'Active prediction at same price already exists' };
+    return { skipped: true, reason: 'Active prediction at similar price already exists' };
   }
 
   // FIX 5: 5-minute recency guard still applies
@@ -124,10 +124,15 @@ function createPrediction(stock) {
     pivotTarget = +(price + atr * 1.5).toFixed(2);
   }
 
-    // FIX 10: Skip if target is too close (less than 0.15% away)
+  // FIX 10: Skip if target is too close (less than 0.15% away)
   const targetDistance = ((pivotTarget - price) / price) * 100;
   if (targetDistance < 0.15) {
     return { skipped: true, reason: `Target too close (${targetDistance.toFixed(2)}%) — not worth trading` };
+  }
+
+  // FIX 11: Skip if target is too far (more than 5% away) — unrealistic for intraday
+  if (targetDistance > 5) {
+    return { skipped: true, reason: `Target too far (${targetDistance.toFixed(1)}%) — unrealistic for intraday` };
   }
 
   let pivotStop = s1 < price ? s1 : s2;

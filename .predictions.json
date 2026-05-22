@@ -3,22 +3,22 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 186.75,
+        "entry": 185,
         "target": 188.07,
-        "stopLoss": 185.3,
+        "stopLoss": 184.21,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.460Z",
+        "createdAt": "2026-05-22T10:20:31.646Z",
         "checked": true,
         "result": "WIN",
-        "hitAt": "2026-05-22T04:48:04.993Z"
+        "hitAt": "2026-05-22T10:22:12.564Z"
       },
       "atr": {
         "method": "ATR",
-        "entry": 186.75,
-        "target": 190.49,
-        "stopLoss": 183.95,
+        "entry": 185,
+        "target": 188.7,
+        "stopLoss": 182.22,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.462Z",
+        "createdAt": "2026-05-22T10:20:31.647Z",
         "checked": false
       },
       "checked": false,
@@ -30,20 +30,22 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 199.49,
+        "entry": 201.1,
         "target": 201.86,
         "stopLoss": 197.95,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.463Z",
-        "checked": false
+        "createdAt": "2026-05-22T10:20:31.647Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T10:22:12.568Z"
       },
       "atr": {
         "method": "ATR",
-        "entry": 199.49,
-        "target": 203.48,
-        "stopLoss": 196.5,
+        "entry": 201.1,
+        "target": 205.12,
+        "stopLoss": 198.08,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.464Z",
+        "createdAt": "2026-05-22T10:20:31.647Z",
         "checked": false
       },
       "checked": false,
@@ -55,45 +57,22 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 532.6,
+        "entry": 530.98,
         "target": 534.14,
         "stopLoss": 526.64,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.464Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": true,
         "result": "WIN",
-        "hitAt": "2026-05-22T04:48:05.018Z"
+        "hitAt": "2026-05-22T10:22:12.572Z"
       },
       "atr": {
         "method": "ATR",
-        "entry": 532.6,
-        "target": 543.25,
-        "stopLoss": 524.61,
+        "entry": 530.98,
+        "target": 541.6,
+        "stopLoss": 523.02,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.464Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    },
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 531.6,
-        "target": 534.14,
-        "stopLoss": 526.64,
-        "confidence": 70,
-        "createdAt": "2026-05-22T09:48:41.676Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 531.6,
-        "target": 542.23,
-        "stopLoss": 523.63,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:41.676Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": false
       },
       "checked": false,
@@ -105,22 +84,22 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 216.21,
+        "entry": 216.01,
         "target": 218.28,
         "stopLoss": 212.42,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.466Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": true,
         "result": "WIN",
-        "hitAt": "2026-05-22T04:48:05.051Z"
+        "hitAt": "2026-05-22T10:22:12.581Z"
       },
       "atr": {
         "method": "ATR",
-        "entry": 216.21,
-        "target": 220.53,
-        "stopLoss": 212.97,
+        "entry": 216.01,
+        "target": 220.33,
+        "stopLoss": 212.77,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.466Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": false
       },
       "checked": false,
@@ -132,20 +111,20 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 426.8,
+        "entry": 425.98,
         "target": 434.54,
         "stopLoss": 418.54,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.468Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 426.8,
-        "target": 435.34,
-        "stopLoss": 420.4,
+        "entry": 425.98,
+        "target": 434.5,
+        "stopLoss": 419.59,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.468Z",
+        "createdAt": "2026-05-22T10:20:31.648Z",
         "checked": false
       },
       "checked": false,
@@ -157,22 +136,22 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 649,
+        "entry": 645.83,
         "target": 653.28,
         "stopLoss": 642.28,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.469Z",
+        "createdAt": "2026-05-22T10:20:31.649Z",
         "checked": true,
         "result": "WIN",
-        "hitAt": "2026-05-22T04:48:05.086Z"
+        "hitAt": "2026-05-22T10:22:12.592Z"
       },
       "atr": {
         "method": "ATR",
-        "entry": 649,
-        "target": 661.98,
-        "stopLoss": 639.26,
+        "entry": 645.83,
+        "target": 658.75,
+        "stopLoss": 636.14,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.469Z",
+        "createdAt": "2026-05-22T10:20:31.649Z",
         "checked": false
       },
       "checked": false,
@@ -184,20 +163,20 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 481.01,
+        "entry": 481.4,
         "target": 485.64,
         "stopLoss": 476.64,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.469Z",
+        "createdAt": "2026-05-22T10:20:31.649Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 481.01,
-        "target": 490.63,
-        "stopLoss": 473.79,
+        "entry": 481.4,
+        "target": 491.03,
+        "stopLoss": 474.18,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.470Z",
+        "createdAt": "2026-05-22T10:20:31.649Z",
         "checked": false
       },
       "checked": false,
@@ -209,21 +188,23 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 85.68,
+        "entry": 84.67,
         "target": 86.66,
-        "stopLoss": 84.77,
+        "stopLoss": 83.99,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.471Z",
+        "createdAt": "2026-05-22T10:20:31.650Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 85.68,
-        "target": 87.39,
-        "stopLoss": 84.39,
+        "entry": 84.67,
+        "target": 86.36,
+        "stopLoss": 83.4,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.471Z",
-        "checked": false
+        "createdAt": "2026-05-22T10:20:31.650Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T10:22:12.595Z"
       },
       "checked": false,
       "result": null,
@@ -234,20 +215,45 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 325.5,
+        "entry": 324,
         "target": 327.74,
         "stopLoss": 322.94,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.472Z",
+        "createdAt": "2026-05-22T10:20:31.650Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 325.5,
-        "target": 332.01,
-        "stopLoss": 320.62,
+        "entry": 324,
+        "target": 330.48,
+        "stopLoss": 319.14,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.472Z",
+        "createdAt": "2026-05-22T10:20:31.650Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "POL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 658,
+        "target": 662.58,
+        "stopLoss": 655.84,
+        "confidence": 70,
+        "createdAt": "2026-05-22T10:20:31.650Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 658,
+        "target": 671.16,
+        "stopLoss": 648.13,
+        "confidence": 65,
+        "createdAt": "2026-05-22T10:20:31.650Z",
         "checked": false
       },
       "checked": false,
@@ -259,20 +265,20 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 233.12,
+        "entry": 234.2,
         "target": 236.04,
         "stopLoss": 231.1,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.473Z",
+        "createdAt": "2026-05-22T10:20:31.651Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 233.12,
-        "target": 237.78,
-        "stopLoss": 229.62,
+        "entry": 234.2,
+        "target": 238.88,
+        "stopLoss": 230.69,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.473Z",
+        "createdAt": "2026-05-22T10:20:31.651Z",
         "checked": false
       },
       "checked": false,
@@ -284,270 +290,20 @@
     {
       "pivot": {
         "method": "PIVOT",
-        "entry": 89,
+        "entry": 88.5,
         "target": 90.22,
         "stopLoss": 87.87,
         "confidence": 70,
-        "createdAt": "2026-05-22T04:46:24.474Z",
+        "createdAt": "2026-05-22T10:20:31.651Z",
         "checked": false
       },
       "atr": {
         "method": "ATR",
-        "entry": 89,
-        "target": 90.78,
-        "stopLoss": 87.67,
+        "entry": 88.5,
+        "target": 90.27,
+        "stopLoss": 87.17,
         "confidence": 65,
-        "createdAt": "2026-05-22T04:46:24.474Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "TSMF": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 18.87,
-        "target": 19.15,
-        "stopLoss": 17.15,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.391Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 18.87,
-        "target": 19.25,
-        "stopLoss": 18.59,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.391Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "CLCPS": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 3.74,
-        "target": 3.98,
-        "stopLoss": 3.12,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.399Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 3.74,
-        "target": 3.81,
-        "stopLoss": 3.68,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.400Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "DADX": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 91.21,
-        "target": 92.58,
-        "stopLoss": 82.92,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.401Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 91.21,
-        "target": 93.03,
-        "stopLoss": 89.84,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.401Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "IDSM": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 45.12,
-        "target": 45.8,
-        "stopLoss": 39.68,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.402Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 45.12,
-        "target": 46.02,
-        "stopLoss": 44.44,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.402Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "FCIBL": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 50.18,
-        "target": 56,
-        "stopLoss": 49.43,
-        "confidence": 70,
-        "createdAt": "2026-05-22T09:48:30.403Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 50.18,
-        "target": 51.18,
-        "stopLoss": 49.43,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.403Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "SGPL": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 36.13,
-        "target": 45.44,
-        "stopLoss": 34.83,
-        "confidence": 70,
-        "createdAt": "2026-05-22T09:48:30.405Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 36.13,
-        "target": 36.85,
-        "stopLoss": 35.59,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.405Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "TSPL": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 9.8,
-        "target": 9.95,
-        "stopLoss": 8.78,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.406Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 9.8,
-        "target": 10,
-        "stopLoss": 9.65,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.406Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "TCORPCPS": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 12.14,
-        "target": 15.4,
-        "stopLoss": 11.39,
-        "confidence": 70,
-        "createdAt": "2026-05-22T09:48:30.407Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 12.14,
-        "target": 12.38,
-        "stopLoss": 11.96,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.407Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "OML": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 32.8,
-        "target": 33.4,
-        "stopLoss": 28.45,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.408Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 32.8,
-        "target": 33.46,
-        "stopLoss": 32.31,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.408Z",
-        "checked": false
-      },
-      "checked": false,
-      "result": null,
-      "hitAt": null
-    }
-  ],
-  "SAIF": [
-    {
-      "pivot": {
-        "method": "PIVOT",
-        "entry": 34.69,
-        "target": 35.21,
-        "stopLoss": 29.88,
-        "confidence": 50,
-        "createdAt": "2026-05-22T09:48:30.410Z",
-        "checked": false
-      },
-      "atr": {
-        "method": "ATR",
-        "entry": 34.69,
-        "target": 35.38,
-        "stopLoss": 34.17,
-        "confidence": 65,
-        "createdAt": "2026-05-22T09:48:30.410Z",
+        "createdAt": "2026-05-22T10:20:31.651Z",
         "checked": false
       },
       "checked": false,
