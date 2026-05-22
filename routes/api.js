@@ -305,6 +305,17 @@ router.get('/kse100/volume-speed', async (req, res) => {
   }
 });
 
+const orderFlowService = require('../services/orderFlowService');
+
+router.get('/orderflow/:symbol', async (req, res) => {
+  try {
+    const analysis = orderFlowService.analyzeRatio(req.params.symbol.toUpperCase());
+    res.json({ success: true, ...analysis });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Clear cache
 router.post('/cache/clear', async (req, res) => {
   si.clearCache();

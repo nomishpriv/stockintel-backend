@@ -219,6 +219,10 @@ async function fetchAllStocks() {
       console.log(`✅ ${stocks.length} stocks`);
       setCache('all', stocks);
 
+      // Record order flow data
+const orderFlowService = require('./orderFlowService');
+orderFlowService.recordFromStocks(stocks);
+
       // Auto-predict & check
       const predictService = require('./predictService');
       predictService.autoPredict(stocks);
