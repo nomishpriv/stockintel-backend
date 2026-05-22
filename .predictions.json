@@ -1,0 +1,558 @@
+{
+  "DGKC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 186.75,
+        "target": 188.07,
+        "stopLoss": 185.3,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.460Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T04:48:04.993Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 186.75,
+        "target": 190.49,
+        "stopLoss": 183.95,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.462Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "EFERT": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 199.49,
+        "target": 201.86,
+        "stopLoss": 197.95,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.463Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 199.49,
+        "target": 203.48,
+        "stopLoss": 196.5,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.464Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "FFC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 532.6,
+        "target": 534.14,
+        "stopLoss": 526.64,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.464Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T04:48:05.018Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 532.6,
+        "target": 543.25,
+        "stopLoss": 524.61,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.464Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    },
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 531.6,
+        "target": 534.14,
+        "stopLoss": 526.64,
+        "confidence": 70,
+        "createdAt": "2026-05-22T09:48:41.676Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 531.6,
+        "target": 542.23,
+        "stopLoss": 523.63,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:41.676Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "HUBC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 216.21,
+        "target": 218.28,
+        "stopLoss": 212.42,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.466Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T04:48:05.051Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 216.21,
+        "target": 220.53,
+        "stopLoss": 212.97,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.466Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "LUCK": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 426.8,
+        "target": 434.54,
+        "stopLoss": 418.54,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.468Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 426.8,
+        "target": 435.34,
+        "stopLoss": 420.4,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.468Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "MARI": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 649,
+        "target": 653.28,
+        "stopLoss": 642.28,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.469Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-22T04:48:05.086Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 649,
+        "target": 661.98,
+        "stopLoss": 639.26,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.469Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "MEBL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 481.01,
+        "target": 485.64,
+        "stopLoss": 476.64,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.469Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 481.01,
+        "target": 490.63,
+        "stopLoss": 473.79,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.470Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "MLCF": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 85.68,
+        "target": 86.66,
+        "stopLoss": 84.77,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.471Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 85.68,
+        "target": 87.39,
+        "stopLoss": 84.39,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.471Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "OGDC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 325.5,
+        "target": 327.74,
+        "stopLoss": 322.94,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.472Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 325.5,
+        "target": 332.01,
+        "stopLoss": 320.62,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.472Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "PPL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 233.12,
+        "target": 236.04,
+        "stopLoss": 231.1,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.473Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 233.12,
+        "target": 237.78,
+        "stopLoss": 229.62,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.473Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "SEARL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 89,
+        "target": 90.22,
+        "stopLoss": 87.87,
+        "confidence": 70,
+        "createdAt": "2026-05-22T04:46:24.474Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 89,
+        "target": 90.78,
+        "stopLoss": 87.67,
+        "confidence": 65,
+        "createdAt": "2026-05-22T04:46:24.474Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "TSMF": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 18.87,
+        "target": 19.15,
+        "stopLoss": 17.15,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.391Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 18.87,
+        "target": 19.25,
+        "stopLoss": 18.59,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.391Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "CLCPS": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 3.74,
+        "target": 3.98,
+        "stopLoss": 3.12,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.399Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 3.74,
+        "target": 3.81,
+        "stopLoss": 3.68,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.400Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "DADX": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 91.21,
+        "target": 92.58,
+        "stopLoss": 82.92,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.401Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 91.21,
+        "target": 93.03,
+        "stopLoss": 89.84,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.401Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "IDSM": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 45.12,
+        "target": 45.8,
+        "stopLoss": 39.68,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.402Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 45.12,
+        "target": 46.02,
+        "stopLoss": 44.44,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.402Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "FCIBL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 50.18,
+        "target": 56,
+        "stopLoss": 49.43,
+        "confidence": 70,
+        "createdAt": "2026-05-22T09:48:30.403Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 50.18,
+        "target": 51.18,
+        "stopLoss": 49.43,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.403Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "SGPL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 36.13,
+        "target": 45.44,
+        "stopLoss": 34.83,
+        "confidence": 70,
+        "createdAt": "2026-05-22T09:48:30.405Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 36.13,
+        "target": 36.85,
+        "stopLoss": 35.59,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.405Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "TSPL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 9.8,
+        "target": 9.95,
+        "stopLoss": 8.78,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.406Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 9.8,
+        "target": 10,
+        "stopLoss": 9.65,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.406Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "TCORPCPS": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 12.14,
+        "target": 15.4,
+        "stopLoss": 11.39,
+        "confidence": 70,
+        "createdAt": "2026-05-22T09:48:30.407Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 12.14,
+        "target": 12.38,
+        "stopLoss": 11.96,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.407Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "OML": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 32.8,
+        "target": 33.4,
+        "stopLoss": 28.45,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.408Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 32.8,
+        "target": 33.46,
+        "stopLoss": 32.31,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.408Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ],
+  "SAIF": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 34.69,
+        "target": 35.21,
+        "stopLoss": 29.88,
+        "confidence": 50,
+        "createdAt": "2026-05-22T09:48:30.410Z",
+        "checked": false
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 34.69,
+        "target": 35.38,
+        "stopLoss": 34.17,
+        "confidence": 65,
+        "createdAt": "2026-05-22T09:48:30.410Z",
+        "checked": false
+      },
+      "checked": false,
+      "result": null,
+      "hitAt": null
+    }
+  ]
+}

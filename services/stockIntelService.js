@@ -100,6 +100,12 @@ async function fetchAllStocks() {
           eps: +s.eps, dps: +s.dps, pe: +s.pr, divYield: +s.di,
           volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
           beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
+          bidPrice: +s.bidp || 0,
+bidVolume: +s.bidv || 0,
+askPrice: +s.askp || 0,
+askVolume: +s.askv || 0,
+spread: +s.askp && +s.bidp ? +(((+s.askp - +s.bidp) / +s.bidp) * 100).toFixed(2) : 0,
+bidAskRatio: +s.bidv && +s.askv ? +((+s.bidv / +s.askv)).toFixed(2) : 0,
           status: 'ACTIVE', lastUpdate: s.d,
           signal: (+s.pch || 0) > 0.01 ? 'BUY' : (+s.pch || 0) < -0.01 ? 'SELL' : 'NEUTRAL'
         }));
@@ -158,51 +164,51 @@ api.interceptors.response.use(
   }
 );
 
-// ========== FETCH ==========
-async function fetchAllStocks() {
-  const cached = getCache('all');
-  if (cached) return cached;
+// // ========== FETCH ==========
+// async function fetchAllStocks() {
+//   const cached = getCache('all');
+//   if (cached) return cached;
 
-  console.log('📡 Fetching...');
-  try {
-    const { data } = await api.get('/market');
-    const raw = data?.data?.eq;
-    if (!raw) return [];
+//   console.log('📡 Fetching...');
+//   try {
+//     const { data } = await api.get('/market');
+//     const raw = data?.data?.eq;
+//     if (!raw) return [];
 
-    const stocks = Object.entries(raw)
-      .filter(([sym, s]) => {
-        if (/R$|PREF|ETF|FUT|-/.test(sym)) return false;
-        if (s.st !== 1 || !s.c || +s.c <= 0) return false;
-        return true;
-      })
-      .map(([sym, s]) => ({
-        symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
-        volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
-        prevClose: +s.ldcp, prevVolume: +s.ldcv, rsi: +s.rsi,
-        upperCircuit: +s.uc, lowerCircuit: +s.lc,
-        pivot: +s.pp?.pp, r1: +s.pp?.r1, r2: +s.pp?.r2, s1: +s.pp?.s1, s2: +s.pp?.s2,
-        perf1w: +s.p1w, perf1m: +s.p1m, perf3m: +s.p3m, perf1y: +s.p1y, perfYtd: +s.pytd,
-        eps: +s.eps, dps: +s.dps, pe: +s.pr, divYield: +s.di,
-        volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
-        beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
-        status: 'ACTIVE', lastUpdate: s.d,
-        signal: (+s.pch || 0) > 0.01 ? 'BUY' : (+s.pch || 0) < -0.01 ? 'SELL' : 'NEUTRAL'
-      }));
+//     const stocks = Object.entries(raw)
+//       .filter(([sym, s]) => {
+//         if (/R$|PREF|ETF|FUT|-/.test(sym)) return false;
+//         if (s.st !== 1 || !s.c || +s.c <= 0) return false;
+//         return true;
+//       })
+//       .map(([sym, s]) => ({
+//         symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
+//         volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
+//         prevClose: +s.ldcp, prevVolume: +s.ldcv, rsi: +s.rsi,
+//         upperCircuit: +s.uc, lowerCircuit: +s.lc,
+//         pivot: +s.pp?.pp, r1: +s.pp?.r1, r2: +s.pp?.r2, s1: +s.pp?.s1, s2: +s.pp?.s2,
+//         perf1w: +s.p1w, perf1m: +s.p1m, perf3m: +s.p3m, perf1y: +s.p1y, perfYtd: +s.pytd,
+//         eps: +s.eps, dps: +s.dps, pe: +s.pr, divYield: +s.di,
+//         volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
+//         beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
+//         status: 'ACTIVE', lastUpdate: s.d,
+//         signal: (+s.pch || 0) > 0.01 ? 'BUY' : (+s.pch || 0) < -0.01 ? 'SELL' : 'NEUTRAL'
+//       }));
 
-    console.log(`✅ ${stocks.length} stocks`);
-    setCache('all', stocks);
-    // Auto-predict & check
-    const predictService = require('./predictService');
-    predictService.autoPredict(stocks);
-    for (const stock of stocks) {
-      try { predictService.checkPrediction(stock.symbol, stock.price, stock.high, stock.low); } catch { }
-    }
-    return stocks;
-  } catch (e) {
-    console.error('❌ Fetch failed:', e.response?.status || e.message);
-    return [];
-  }
-}
+//     console.log(`✅ ${stocks.length} stocks`);
+//     setCache('all', stocks);
+//     // Auto-predict & check
+//     const predictService = require('./predictService');
+//     predictService.autoPredict(stocks);
+//     for (const stock of stocks) {
+//       try { predictService.checkPrediction(stock.symbol, stock.price, stock.high, stock.low); } catch { }
+//     }
+//     return stocks;
+//   } catch (e) {
+//     console.error('❌ Fetch failed:', e.response?.status || e.message);
+//     return [];
+//   }
+// }
 
 async function getStock(s) { const all = await fetchAllStocks(); return all.find(x => x.symbol === s.toUpperCase()) || null; }
 async function getSummary() {
