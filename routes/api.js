@@ -5,6 +5,7 @@ const smcService = require('../services/smcService');
 const predictService = require('../services/predictService');
 const newsService = require('../services/newsService');
 const shariahTradeService = require('../services/shariahTradeService');
+const institutionalService = require('../services/institutionalActivityService');
 
 
 
@@ -321,6 +322,16 @@ router.get('/orderflow/:symbol', async (req, res) => {
 router.get('/shariah/trades', async (req, res) => {
   try {
     const data = await shariahTradeService.getShariahTradeRecommendations();
+    res.json({ success: true, ...data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+router.get('/institutional', async (req, res) => {
+  try {
+    const data = await institutionalService.analyzeInstitutionalActivity();
+    if (!data) return res.status(404).json({ success: false, error: 'Data not available' });
     res.json({ success: true, ...data });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });

@@ -38,7 +38,6 @@ function saveToken(token) {
 let loginPromise = null;
 
 async function loginAndGetToken() {
-  // If already logging in, wait for that one
   if (loginPromise) return loginPromise;
 
   loginPromise = (async () => {
@@ -69,7 +68,39 @@ async function loginAndGetToken() {
   return loginPromise;
 }
 
-let fetchPromise = null;
+async function getToken() {
+  const stored = loadToken();
+  if (stored) return stored;
+
+  const newToken = await loginAndGetToken();
+  if (newToken) return newToken;
+
+  return process.env.STOCKINTEL_TOKEN || '';
+}
+
+// ========== API ==========
+const api = axios.create({ baseURL: BASE, timeout: 15000 });
+
+api.interceptors.request.use(async (config) => {
+  config.headers.Authorization = `Bearer ${await getToken()}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    if (err.response?.status === 403) {
+      console.log('🔄 Token expired, refreshing...');
+      try { fs.unlinkSync(TOKEN_FILE); } catch { }
+      const newToken = await loginAndGetToken();
+      if (newToken) {
+        err.config.headers.Authorization = `Bearer ${newToken}`;
+        return api(err.config);
+      }
+    }
+    return Promise.reject(err);
+  }
+);
 
 // ========== KSE100 VOLUME ANALYSIS ==========
 let kseVolumeCache = null;
@@ -112,6 +143,24 @@ function analyzeKSE100Volume(kseData) {
   };
 }
 
+async function getKSE100Volume() {
+  const now = Date.now();
+  if (kseVolumeCache && (now - kseVolumeLastFetch) < TTL) return kseVolumeCache;
+
+  try {
+    const { data } = await api.get('/market');
+    const kseData = data?.data?.in?.KSE100;
+    if (!kseData) return null;
+
+    const analysis = analyzeKSE100Volume(kseData);
+    kseVolumeCache = analysis;
+    kseVolumeLastFetch = now;
+    return analysis;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ========== VOLUME SPEED ==========
 let volumeSpeedCache = { lastVolume: 0, lastTime: 0, candles: [] };
 
@@ -152,6 +201,32 @@ function analyzeVolumeSpeed(currentVolume, currentTime) {
 
   return { currentVolume, volDiff, timeDiffSeconds: Math.round(timeDiff * 60), perMinute, avgSpeed5Min: Math.round(avgSpeed), trend, color, message };
 }
+
+async function getVolumeSpeed() {
+  try {
+    const { data } = await api.get('/market');
+    const kseData = data?.data?.in?.KSE100;
+    if (!kseData) return null;
+
+    const currentVolume = +kseData.v || 0;
+    const currentTime = Date.now();
+    const speed = analyzeVolumeSpeed(currentVolume, currentTime);
+    if (!speed) return null;
+
+    const avg10 = +kseData.v10a || 1;
+    return {
+      ...speed,
+      ratioVsAvg: +((currentVolume / avg10) * 100).toFixed(1),
+      indexValue: +kseData.c || 0,
+      changePercent: +kseData.pch ? +(kseData.pch * 100).toFixed(2) : 0
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// ========== FETCH ALL STOCKS ==========
+let fetchPromise = null;
 
 async function fetchAllStocks() {
   const cached = getCache('all');
@@ -220,8 +295,8 @@ async function fetchAllStocks() {
       setCache('all', stocks);
 
       // Record order flow data
-const orderFlowService = require('./orderFlowService');
-orderFlowService.recordFromStocks(stocks);
+      const orderFlowService = require('./orderFlowService');
+      orderFlowService.recordFromStocks(stocks);
 
       // Auto-predict & check
       const predictService = require('./predictService');
@@ -241,47 +316,6 @@ orderFlowService.recordFromStocks(stocks);
   return fetchPromise;
 }
 
-async function getToken() {
-  // 1. Check stored token
-  const stored = loadToken();
-  if (stored) return stored;
-
-  // 2. Try auto-login ONCE
-  const newToken = await loginAndGetToken();
-  if (newToken) return newToken;
-
-  // 3. Fallback to manual token from .env
-  return process.env.STOCKINTEL_TOKEN || '';
-}
-
-// ========== API ==========
-const api = axios.create({ baseURL: BASE, timeout: 15000 });
-
-api.interceptors.request.use(async (config) => {
-  config.headers.Authorization = `Bearer ${await getToken()}`;
-  return config;
-});
-
-// ADD THIS INTERCEPTOR:
-api.interceptors.response.use(
-  (res) => res,
-  async (err) => {
-    if (err.response?.status === 403) {
-      console.log('🔄 Token expired, refreshing...');
-      // Delete bad token file
-      try { fs.unlinkSync(TOKEN_FILE); } catch { }
-      // Try fresh login
-      const newToken = await loginAndGetToken();
-      if (newToken) {
-        err.config.headers.Authorization = `Bearer ${newToken}`;
-        return api(err.config);
-      }
-    }
-    return Promise.reject(err);
-  }
-);
-
-
 async function getStock(s) { const all = await fetchAllStocks(); return all.find(x => x.symbol === s.toUpperCase()) || null; }
 async function getSummary() {
   const all = await fetchAllStocks();
@@ -292,4 +326,4 @@ async function searchStocks(q) { const all = await fetchAllStocks(); const ql = 
 async function getOpportunities(n = 10) { const all = await fetchAllStocks(); return all.filter(s => s.price > 0 && s.volume > 10000).sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).slice(0, n); }
 function clearCache() { cache.clear(); }
 
-module.exports = { fetchAllStocks, getStock, getSummary, searchStocks, getOpportunities, clearCache };
+module.exports = { fetchAllStocks, getStock, getSummary, searchStocks, getOpportunities, clearCache, getKSE100Volume, getVolumeSpeed, getToken };
