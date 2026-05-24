@@ -4,6 +4,8 @@ const si = require('../services/stockIntelService');
 const smcService = require('../services/smcService');
 const predictService = require('../services/predictService');
 const newsService = require('../services/newsService');
+const shariahTradeService = require('../services/shariahTradeService');
+
 
 
 // Get all stocks
@@ -311,6 +313,15 @@ router.get('/orderflow/:symbol', async (req, res) => {
   try {
     const analysis = orderFlowService.analyzeRatio(req.params.symbol.toUpperCase());
     res.json({ success: true, ...analysis });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+router.get('/shariah/trades', async (req, res) => {
+  try {
+    const data = await shariahTradeService.getShariahTradeRecommendations();
+    res.json({ success: true, ...data });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
