@@ -4,29 +4,78 @@ const path = require('path');
 const PREDICT_FILE = path.join(__dirname, '..', '.predictions.json');
 const STATE_FILE   = path.join(__dirname, '..', '.predict-state.json');
 
+// FIX: Promise caches so concurrent loads share one disk read instead of
+// hammering the filesystem when checkPrediction is called in a tight loop
+// (e.g., 500+ times per fetch cycle).
+let predictLoadPromise = null;
+let stateLoadPromise   = null;
+
+// FIX: Write queues so overlapping saves don't corrupt JSON by reading
+// stale data, mutating it, and writing over a newer version.
+let predictSaveQueue = Promise.resolve();
+let stateSaveQueue   = Promise.resolve();
+
 // ========== LOAD / SAVE ==========
-function loadPredictions() {
-  try {
-    if (fs.existsSync(PREDICT_FILE))
-      return JSON.parse(fs.readFileSync(PREDICT_FILE, 'utf8'));
-  } catch {}
-  return {};
+async function loadPredictions() {
+  if (predictLoadPromise) return predictLoadPromise;
+
+  predictLoadPromise = (async () => {
+    try {
+      const raw = await fs.promises.readFile(PREDICT_FILE, 'utf8');
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    } finally {
+      predictLoadPromise = null;
+    }
+  })();
+
+  return predictLoadPromise;
 }
 
-function savePredictions(data) {
-  fs.writeFileSync(PREDICT_FILE, JSON.stringify(data, null, 2));
+async function savePredictions(data) {
+  predictSaveQueue = predictSaveQueue.then(async () => {
+    try {
+      const dir = path.dirname(PREDICT_FILE);
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(PREDICT_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.error('❌ Failed to save predictions:', e.message);
+    }
+  }).catch(() => {});
+
+  return predictSaveQueue;
 }
 
-function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE))
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-  } catch {}
-  return { lastAutoPredict: 0 };
+async function loadState() {
+  if (stateLoadPromise) return stateLoadPromise;
+
+  stateLoadPromise = (async () => {
+    try {
+      const raw = await fs.promises.readFile(STATE_FILE, 'utf8');
+      return JSON.parse(raw);
+    } catch {
+      return { lastAutoPredict: 0 };
+    } finally {
+      stateLoadPromise = null;
+    }
+  })();
+
+  return stateLoadPromise;
 }
 
-function saveState(state) {
-  try { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2)); } catch {}
+async function saveState(state) {
+  stateSaveQueue = stateSaveQueue.then(async () => {
+    try {
+      const dir = path.dirname(STATE_FILE);
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+    } catch (e) {
+      console.error('❌ Failed to save state:', e.message);
+    }
+  }).catch(() => {});
+
+  return stateSaveQueue;
 }
 
 // ========== MARKET HOURS (PKT = UTC+5) ==========
@@ -38,7 +87,6 @@ function isMarketOpen() {
 }
 
 // ========== ATR (True Range, single-candle approximation) ==========
-// FIX: stock.atr does not exist in stockService — compute it here
 // True Range = max( H-L, |H-prevClose|, |L-prevClose| )
 // Floor at 0.5% of price so near-zero ATR never slips through
 function computeATR(stock) {
@@ -50,7 +98,7 @@ function computeATR(stock) {
 }
 
 // ========== ENTRY VALIDATION ==========
-// FIX: reject entry prices that are stale (>3% below yesterday's close).
+// Reject entry prices that are stale (>3% below yesterday's close).
 // Caused false WINs within 2 minutes by comparing old entries against live prices.
 function isEntryValid(entry, ldcp, tolerancePct = 0.03) {
   if (!ldcp || ldcp <= 0) return true;          // can't validate without LDCP
@@ -67,19 +115,19 @@ const TOP_SYMBOLS = [
 ];
 
 // ========== AUTO-PREDICT ==========
-function autoPredict(stocks) {
+async function autoPredict(stocks) {
   if (!isMarketOpen()) return [];
 
-  const state = loadState();
+  const state = await loadState();
   if (Date.now() - state.lastAutoPredict < 900000) return [];   // 15-min cooldown
 
   state.lastAutoPredict = Date.now();
-  saveState(state);
+  await saveState(state);
 
   const results = [];
   for (const stock of stocks) {
     if (!TOP_SYMBOLS.includes(stock.symbol)) continue;
-    const result = createPrediction(stock);
+    const result = await createPrediction(stock);
     if (!result.skipped) results.push(stock.symbol);
   }
 
@@ -88,7 +136,7 @@ function autoPredict(stocks) {
 }
 
 // ========== CREATE PREDICTION ==========
-function createPrediction(stock) {
+async function createPrediction(stock) {
   if (!isMarketOpen())
     return { skipped: true, reason: 'Market is closed' };
 
@@ -96,7 +144,6 @@ function createPrediction(stock) {
   if (price <= 0)
     return { skipped: true, reason: 'Invalid price' };
 
-  // FIX: compute ATR from stock OHLC fields
   const atr = computeATR(stock);
 
   if (stock.volume <= 10000)
@@ -105,7 +152,6 @@ function createPrediction(stock) {
   if (atr < price * 0.003)
     return { skipped: true, reason: 'ATR too small — low volatility' };
 
-  // FIX: reject stale entry vs LDCP
   if (!isEntryValid(price, stock.prevClose))
     return { skipped: true, reason: `Entry ${price} is stale vs LDCP ${stock.prevClose} — skip` };
 
@@ -114,7 +160,7 @@ function createPrediction(stock) {
   const s1 = stock.s1 || 0;
   const s2 = stock.s2 || 0;
 
-  const all      = loadPredictions();
+  const all      = await loadPredictions();
   const existing = all[stock.symbol] || [];
 
   // Skip if an unchecked prediction at a similar price already exists
@@ -124,20 +170,20 @@ function createPrediction(stock) {
   if (samePrice)
     return { skipped: true, reason: 'Active prediction at similar price already exists' };
 
-  // 5-minute recency guard
+  // 5-minute recency guard (any prediction, checked or unchecked)
   const recent = existing.find(p =>
     Date.now() - new Date(p.pivot.createdAt).getTime() < 300000
   );
   if (recent)
     return { skipped: true, reason: 'Already predicted in the last 5 minutes' };
 
-  // FIX: pivot target — prefer R1, fall back to R2, then ATR-based
+  // Pivot target — prefer R1, fall back to R2, then ATR-based
   let pivotTarget =
     r1 > price ? f2(r1) :
     r2 > price ? f2(r2) :
     f2(price + atr * 1.5);
 
-  // FIX: pivot stop — prefer S1, fall back to S2, then ATR-based
+  // Pivot stop — prefer S1, fall back to S2, then ATR-based
   let pivotStop =
     s1 > 0 && s1 < price ? f2(s1) :
     s2 > 0 && s2 < price ? f2(s2) :
@@ -150,7 +196,7 @@ function createPrediction(stock) {
   if (targetPct > 5)
     return { skipped: true, reason: `Target too far (${targetPct.toFixed(1)}%) — unrealistic for intraday` };
 
-  // FIX: R:R ratio gate — minimum 1:1 required
+  // R:R ratio gate — minimum 1:1 required
   const reward = pivotTarget - price;
   const risk   = price - pivotStop;
   if (risk <= 0 || reward / risk < 1)
@@ -191,15 +237,23 @@ function createPrediction(stock) {
   if (all[stock.symbol].length > 50)
     all[stock.symbol] = all[stock.symbol].slice(-50);
 
-  savePredictions(all);
+  await savePredictions(all);
   return entry;
 }
 
 // ========== CHECK PREDICTION ==========
-function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
-  const all        = loadPredictions();
+// NOTE: currentPrice is passed by the caller (stockIntelService) but is
+// intentionally unused in this version — only currentHigh / currentLow are
+// needed to determine whether target or stop was hit.
+async function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
+  const all        = await loadPredictions();
   const stockPreds = all[symbol] || [];
   let updated      = false;
+
+  // FIX: Guard against invalid high/low data (0 or missing) which would
+  // cause currentLow <= stopLoss to fire immediately and falsely record
+  // a LOSS when the API simply didn't send high/low values.
+  const hasValidHL = currentHigh > 0 && currentLow > 0 && currentHigh >= currentLow;
 
   for (const pred of stockPreds) {
     if (pred.checked) continue;
@@ -209,7 +263,7 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
     if (age < 60000) continue;
 
     // Check PIVOT method
-    if (!pred.pivot.checked) {
+    if (!pred.pivot.checked && hasValidHL) {
       if (currentHigh >= pred.pivot.target) {
         pred.pivot.result  = 'WIN';
         pred.pivot.checked = true;
@@ -224,7 +278,7 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
     }
 
     // Check ATR method
-    if (!pred.atr.checked) {
+    if (!pred.atr.checked && hasValidHL) {
       if (currentHigh >= pred.atr.target) {
         pred.atr.result  = 'WIN';
         pred.atr.checked = true;
@@ -238,7 +292,7 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
       }
     }
 
-    // FIX: roll up parent fields when both methods are resolved
+    // Roll up parent fields when both methods are resolved
     if (pred.pivot.checked && pred.atr.checked) {
       pred.checked = true;
       // WIN if either method hit target; LOSS only if both lost
@@ -248,7 +302,7 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
     }
   }
 
-  if (updated) savePredictions(all);
+  if (updated) await savePredictions(all);
 
   // Build return summary
   const active    = stockPreds.filter(p => !p.checked);
@@ -280,8 +334,8 @@ function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
 }
 
 // ========== ACCURACY SUMMARY (single symbol) ==========
-function getAccuracySummary(symbol) {
-  const all        = loadPredictions();
+async function getAccuracySummary(symbol) {
+  const all        = await loadPredictions();
   const stockPreds = all[symbol] || [];
   const completed  = stockPreds.filter(p => p.checked);
 
@@ -321,10 +375,13 @@ function getAccuracySummary(symbol) {
 }
 
 // ========== ACCURACY SUMMARY (all symbols) ==========
-function getAllAccuracies() {
-  const all = loadPredictions();
-  return Object.keys(all)
-    .map(symbol => getAccuracySummary(symbol))
+async function getAllAccuracies() {
+  const all = await loadPredictions();
+  const summaries = [];
+  for (const symbol of Object.keys(all)) {
+    summaries.push(await getAccuracySummary(symbol));
+  }
+  return summaries
     .filter(r => r.totalCompleted >= 3)
     .sort((a, b) => (b.pivotAccuracy || 0) - (a.pivotAccuracy || 0));
 }

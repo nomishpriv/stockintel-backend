@@ -21,18 +21,29 @@ function getCache(k) {
 function setCache(k, d) { cache.set(k, { d, t: Date.now() }); }
 
 // ========== TOKEN ==========
-function loadToken() {
+// FIX: Switched to async fs to avoid blocking the event loop.
+// FIX: Added directory creation so write doesn't crash if folder is missing.
+async function loadToken() {
   try {
-    if (fs.existsSync(TOKEN_FILE)) {
-      const data = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
-      if (data.expiry > Date.now()) return data.token;
-    }
+    await fs.promises.access(TOKEN_FILE);
+    const raw = await fs.promises.readFile(TOKEN_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    if (data.expiry > Date.now()) return data.token;
   } catch { }
   return null;
 }
 
-function saveToken(token) {
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token, expiry: Date.now() + 3500000 }));
+async function saveToken(token) {
+  try {
+    const dir = path.dirname(TOKEN_FILE);
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(
+      TOKEN_FILE,
+      JSON.stringify({ token, expiry: Date.now() + 3500000 })
+    );
+  } catch (e) {
+    console.error('❌ Failed to save token:', e.message);
+  }
 }
 
 let loginPromise = null;
@@ -50,7 +61,7 @@ async function loginAndGetToken() {
 
       const token = data?.data?.access_token;
       if (token) {
-        saveToken(token);
+        await saveToken(token); // FIX: await async saveToken
         console.log('✅ Auto-login success');
         return token;
       }
@@ -69,7 +80,7 @@ async function loginAndGetToken() {
 }
 
 async function getToken() {
-  const stored = loadToken();
+  const stored = await loadToken(); // FIX: await async loadToken
   if (stored) return stored;
 
   const newToken = await loginAndGetToken();
@@ -91,7 +102,7 @@ api.interceptors.response.use(
   async (err) => {
     if (err.response?.status === 403) {
       console.log('🔄 Token expired, refreshing...');
-      try { fs.unlinkSync(TOKEN_FILE); } catch { }
+      try { await fs.promises.unlink(TOKEN_FILE); } catch { } // FIX: async unlink
       const newToken = await loginAndGetToken();
       if (newToken) {
         err.config.headers.Authorization = `Bearer ${newToken}`;
@@ -101,6 +112,33 @@ api.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+// ========== SHARED MARKET DATA ==========
+// FIX: New helper so /market is fetched once and reused by all consumers.
+// This stops fetchAllStocks, getKSE100Volume and getVolumeSpeed from making
+// separate network calls.
+let marketDataPromise = null;
+
+async function fetchMarketData() {
+  const cached = getCache('market_raw');
+  if (cached) return cached;
+
+  if (marketDataPromise) return marketDataPromise;
+
+  marketDataPromise = (async () => {
+    try {
+      const { data } = await api.get('/market');
+      setCache('market_raw', data);
+      return data;
+    } catch (e) {
+      throw e;
+    } finally {
+      marketDataPromise = null;
+    }
+  })();
+
+  return marketDataPromise;
+}
 
 // ========== KSE100 VOLUME ANALYSIS ==========
 let kseVolumeCache = null;
@@ -148,7 +186,7 @@ async function getKSE100Volume() {
   if (kseVolumeCache && (now - kseVolumeLastFetch) < TTL) return kseVolumeCache;
 
   try {
-    const { data } = await api.get('/market');
+    const data = await fetchMarketData(); // FIX: reuse shared fetch instead of extra api.get
     const kseData = data?.data?.in?.KSE100;
     if (!kseData) return null;
 
@@ -178,17 +216,28 @@ function analyzeVolumeSpeed(currentVolume, currentTime) {
   volumeSpeedCache.candles.push({ time: currentTime, volume: volDiff, perMinute });
   if (volumeSpeedCache.candles.length > 30) volumeSpeedCache.candles.shift();
 
+  // FIX: Compare averages by actual slice length instead of hardcoded /2.
+  // Old code divided by 2 even when the slice had only 1 item, skewing results.
   const recent = volumeSpeedCache.candles.slice(-5);
-  const avgSpeed = recent.reduce((s, c) => s + c.perMinute, 0) / recent.length;
-  const firstHalf = recent.slice(0, 2).reduce((s, c) => s + c.perMinute, 0) / 2;
-  const secondHalf = recent.slice(-2).reduce((s, c) => s + c.perMinute, 0) / 2;
+  const avgSpeed = recent.reduce((s, c) => s + c.perMinute, 0) / (recent.length || 1);
+
+  const splitIdx = Math.floor(recent.length / 2);
+  const firstSlice = recent.slice(0, splitIdx);
+  const secondSlice = recent.slice(splitIdx);
+
+  const firstAvg = firstSlice.length
+    ? firstSlice.reduce((s, c) => s + c.perMinute, 0) / firstSlice.length
+    : 0;
+  const secondAvg = secondSlice.length
+    ? secondSlice.reduce((s, c) => s + c.perMinute, 0) / secondSlice.length
+    : 0;
 
   let trend, color, message;
-  if (secondHalf > firstHalf * 1.5) {
+  if (secondAvg > firstAvg * 1.5) {
     trend = 'SURGING'; color = '#a855f7'; message = `Volume surging — ${perMinute.toLocaleString()}/min`;
-  } else if (secondHalf > firstHalf * 1.2) {
+  } else if (secondAvg > firstAvg * 1.2) {
     trend = 'ACCELERATING'; color = '#f97316'; message = `Volume accelerating — ${perMinute.toLocaleString()}/min`;
-  } else if (secondHalf < firstHalf * 0.5) {
+  } else if (secondAvg < firstAvg * 0.5) {
     trend = 'SLOWING'; color = '#64748b'; message = `Volume slowing — ${perMinute.toLocaleString()}/min`;
   } else if (perMinute > avgSpeed * 1.5) {
     trend = 'SPIKE'; color = '#ef4444'; message = `Volume spike! ${perMinute.toLocaleString()}/min`;
@@ -204,7 +253,7 @@ function analyzeVolumeSpeed(currentVolume, currentTime) {
 
 async function getVolumeSpeed() {
   try {
-    const { data } = await api.get('/market');
+    const data = await fetchMarketData(); // FIX: reuse shared fetch instead of extra api.get
     const kseData = data?.data?.in?.KSE100;
     if (!kseData) return null;
 
@@ -237,7 +286,7 @@ async function fetchAllStocks() {
   fetchPromise = (async () => {
     console.log('📡 Fetching...');
     try {
-      const { data } = await api.get('/market');
+      const data = await fetchMarketData(); // FIX: reuse shared fetch
       const raw = data?.data?.eq;
       if (!raw) return [];
 
@@ -261,13 +310,30 @@ async function fetchAllStocks() {
         .map(([sym, s]) => ({
           symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
           volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
-          prevClose: +s.ldcp, prevVolume: +s.ldcv, rsi: +s.rsi,
+          prevClose: +s.ldcp, prevVolume: +s.ldcv,
+          rsi: +(s.rsi ?? 0), // FIX: NaN guard — missing rsi becomes 0 instead of NaN
           upperCircuit: +s.uc, lowerCircuit: +s.lc,
-          pivot: +s.pp?.pp, r1: +s.pp?.r1, r2: +s.pp?.r2, s1: +s.pp?.s1, s2: +s.pp?.s2,
-          perf1w: +s.p1w, perf1m: +s.p1m, perf3m: +s.p3m, perf1y: +s.p1y, perfYtd: +s.pytd,
-          eps: +s.eps, dps: +s.dps, pe: +s.pr, divYield: +s.di,
-          volAvg1w: +s.vaw, volAvg10d: +s.va10d, volAvg1m: +s.vam, volAvg30d: +s.v30a,
-          beta1m: +s.bt?.['1m'], beta1y: +s.bt?.['1y'],
+          // FIX: NaN guards for all optional nested fields
+          pivot: +(s.pp?.pp ?? 0),
+          r1: +(s.pp?.r1 ?? 0),
+          r2: +(s.pp?.r2 ?? 0),
+          s1: +(s.pp?.s1 ?? 0),
+          s2: +(s.pp?.s2 ?? 0),
+          perf1w: +(s.p1w ?? 0),
+          perf1m: +(s.p1m ?? 0),
+          perf3m: +(s.p3m ?? 0),
+          perf1y: +(s.p1y ?? 0),
+          perfYtd: +(s.pytd ?? 0),
+          eps: +(s.eps ?? 0),
+          dps: +(s.dps ?? 0),
+          pe: +(s.pr ?? 0),
+          divYield: +(s.di ?? 0),
+          volAvg1w: +(s.vaw ?? 0),
+          volAvg10d: +(s.va10d ?? 0),
+          volAvg1m: +(s.vam ?? 0),
+          volAvg30d: +(s.v30a ?? 0),
+          beta1m: +(s.bt?.['1m'] ?? 0),
+          beta1y: +(s.bt?.['1y'] ?? 0),
           bidPrice: s.bidp ? +s.bidp : 0,
           bidVolume: s.bidv ? +s.bidv : 0,
           askPrice: s.askp ? +s.askp : 0,
@@ -278,7 +344,7 @@ async function fetchAllStocks() {
           status: 'ACTIVE', lastUpdate: s.d,
           signal: (() => {
             const pch = +s.pch || 0;
-            const rsi = +s.rsi || 50;
+            const rsi = +(s.rsi ?? 0); // FIX: consistent NaN guard
             const ratio = (s.bidv && s.askv && +s.askv > 0) ? +s.bidv / +s.askv : 1;
             let score = 0;
             if (pch > 0.01) score++;
@@ -294,16 +360,25 @@ async function fetchAllStocks() {
       console.log(`✅ ${stocks.length} stocks`);
       setCache('all', stocks);
 
-      // Record order flow data
-      const orderFlowService = require('./orderFlowService');
-      orderFlowService.recordFromStocks(stocks);
-
-      // Auto-predict & check
-      const predictService = require('./predictService');
-      predictService.autoPredict(stocks);
-      for (const stock of stocks) {
-        try { predictService.checkPrediction(stock.symbol, stock.price, stock.high, stock.low); } catch { }
+      // FIX: Wrap optional services in try/catch so a missing file doesn't
+      // wipe out the entire stock list by returning [].
+      try {
+        const orderFlowService = require('./orderFlowService');
+        orderFlowService.recordFromStocks(stocks);
+      } catch (e) {
+        // Optional service not available
       }
+
+      try {
+        const predictService = require('./predictService');
+        predictService.autoPredict(stocks);
+        for (const stock of stocks) {
+          try { predictService.checkPrediction(stock.symbol, stock.price, stock.high, stock.low); } catch { }
+        }
+      } catch (e) {
+        // Optional service not available
+      }
+
       return stocks;
     } catch (e) {
       console.error('❌ Fetch failed:', e.response?.status || e.message);
@@ -316,14 +391,46 @@ async function fetchAllStocks() {
   return fetchPromise;
 }
 
-async function getStock(s) { const all = await fetchAllStocks(); return all.find(x => x.symbol === s.toUpperCase()) || null; }
+// FIX: Input guards to prevent crashes on null / non-string arguments.
+async function getStock(s) {
+  if (!s || typeof s !== 'string') return null;
+  const all = await fetchAllStocks();
+  return all.find(x => x.symbol === s.toUpperCase()) || null;
+}
+
 async function getSummary() {
   const all = await fetchAllStocks();
   const a = all.filter(s => s.price > 0);
-  return { total: all.length, active: a.length, gainers: a.filter(s => s.changePercent > 0).length, losers: a.filter(s => s.changePercent < 0).length, avgChange: +(a.reduce((x, b) => x + b.changePercent, 0) / a.length).toFixed(2) || 0 };
+  return {
+    total: all.length,
+    active: a.length,
+    gainers: a.filter(s => s.changePercent > 0).length,
+    losers: a.filter(s => s.changePercent < 0).length,
+    avgChange: +(a.reduce((x, b) => x + b.changePercent, 0) / a.length).toFixed(2) || 0
+  };
 }
-async function searchStocks(q) { const all = await fetchAllStocks(); const ql = q.toLowerCase(); return all.filter(s => s.symbol.toLowerCase().includes(ql) || s.name.toLowerCase().includes(ql)).slice(0, 20); }
-async function getOpportunities(n = 10) { const all = await fetchAllStocks(); return all.filter(s => s.price > 0 && s.volume > 10000).sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).slice(0, n); }
-function clearCache() { cache.clear(); }
 
-module.exports = { fetchAllStocks, getStock, getSummary, searchStocks, getOpportunities, clearCache, getKSE100Volume, getVolumeSpeed, getToken };
+async function searchStocks(q) {
+  if (!q || typeof q !== 'string') return []; // FIX: guard against bad input
+  const all = await fetchAllStocks();
+  const ql = q.toLowerCase();
+  return all.filter(s => s.symbol.toLowerCase().includes(ql) || s.name.toLowerCase().includes(ql)).slice(0, 20);
+}
+
+async function getOpportunities(n = 10) {
+  const all = await fetchAllStocks();
+  return all.filter(s => s.price > 0 && s.volume > 10000).sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).slice(0, n);
+}
+
+// FIX: Also wipe volume caches so stale data doesn't linger.
+function clearCache() {
+  cache.clear();
+  kseVolumeCache = null;
+  kseVolumeLastFetch = 0;
+  volumeSpeedCache = { lastVolume: 0, lastTime: 0, candles: [] };
+}
+
+module.exports = {
+  fetchAllStocks, getStock, getSummary, searchStocks,
+  getOpportunities, clearCache, getKSE100Volume, getVolumeSpeed, getToken
+};

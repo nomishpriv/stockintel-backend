@@ -64,7 +64,10 @@ function decodeEntities(str) {
 }
 
 function isStale(pubDate) {
-  if (!pubDate || isNaN(pubDate)) return false; // no date → keep it
+  // NOTE: Items without a valid date are kept indefinitely. This is
+  // intentional for feeds that omit pubDate, but it means ancient undated
+  // stories can only be removed by deduplication, not age filtering.
+  if (!pubDate || isNaN(pubDate)) return false;
   return (Date.now() - pubDate.getTime()) / 3_600_000 > MAX_AGE_HOURS;
 }
 
@@ -73,6 +76,8 @@ function deduplicate(items) {
   const seen   = new Set();
   const result = [];
   for (const item of items) {
+    // FIX: Guard against missing or empty titles that would crash toLowerCase().
+    if (!item.title || typeof item.title !== 'string') continue;
     const key = item.title.toLowerCase().replace(/\W+/g, ' ').split(' ').slice(0, 6).join(' ');
     if (!seen.has(key)) {
       seen.add(key);
@@ -99,6 +104,10 @@ function isPSXRelevant(title) {
 }
 
 // ─── RSS FETCHER ──────────────────────────────────────────────────────────────
+// NOTE: This uses regex-based XML scraping. It works for well-formed RSS
+// but is brittle against CDATA edge cases, nested tags inside titles, or
+// non-RSS XML responses. For production robustness consider swapping to a
+// proper XML parser (fast-xml-parser, xml2js) if feeds start breaking.
 async function fetchRSS(source) {
   try {
     const { data } = await axios.get(source.url, {
@@ -150,13 +159,25 @@ async function fetchMettisAPI(source) {
 
     return data
       .map(item => {
-        const title = item?.Headings?.Heading?.[0] || item?.Descriptions?.Description?.[0] || '';
+        // FIX: Mettis sometimes returns a single object for Heading / Description
+        // instead of an array. The old code did item?.Headings?.Heading?.[0] which
+        // would return the first character of a string instead of the full title.
+        const headingRaw = item?.Headings?.Heading;
+        const descRaw    = item?.Descriptions?.Description;
+        const title =
+          (Array.isArray(headingRaw) ? headingRaw[0] : headingRaw) ||
+          (Array.isArray(descRaw)    ? descRaw[0]    : descRaw)    ||
+          '';
         if (!title || title.length < 10) return null;
 
         const pubDate = item?.PublishedTime ? new Date(item.PublishedTime) : null;
         if (isStale(pubDate)) return null;
 
-        const isPSX = item?.Tags?.Tag?.some(
+        // FIX: Tags.Tag may be a single object instead of an array.
+        // The old .some() would throw TypeError in that case.
+        const tagNode = item?.Tags?.Tag;
+        const tags = Array.isArray(tagNode) ? tagNode : (tagNode ? [tagNode] : []);
+        const isPSX = tags.some(
           t => t.TagName === 'KSE100' || t.TagType === 'Indices' || t.TagType === 'Companies'
         ) || false;
 
@@ -277,92 +298,130 @@ async function getNewsImpact({ forceRefresh = false } = {}) {
   console.log('📰 Fetching fresh news from all sources...');
   const startTime = Date.now();
 
-  // Fetch everything in parallel
-  const [rssResults, mettisResults] = await Promise.all([
-    Promise.all(NEWS_SOURCES.map(fetchRSS)),
-    Promise.all(METTIS_APIS.map(fetchMettisAPI)),
-  ]);
+  try {
+    // Fetch everything in parallel
+    const [rssResults, mettisResults] = await Promise.all([
+      Promise.all(NEWS_SOURCES.map(fetchRSS)),
+      Promise.all(METTIS_APIS.map(fetchMettisAPI)),
+    ]);
 
-  // Merge — Mettis first (higher weight/priority)
-  const allItems = [
-    ...mettisResults.flat(),
-    ...rssResults.flat(),
-  ];
+    // Merge — Mettis first (higher weight/priority)
+    const allItems = [
+      ...mettisResults.flat(),
+      ...rssResults.flat(),
+    ];
 
-  // Sort newest-first so dedup keeps the freshest copy of each story
-  allItems.sort((a, b) => {
-    if (!a.pubDate || isNaN(a.pubDate)) return 1;
-    if (!b.pubDate || isNaN(b.pubDate)) return -1;
-    return b.pubDate - a.pubDate;
-  });
+    // Sort newest-first so dedup keeps the freshest copy of each story
+    allItems.sort((a, b) => {
+      if (!a.pubDate || isNaN(a.pubDate)) return 1;
+      if (!b.pubDate || isNaN(b.pubDate)) return -1;
+      return b.pubDate - a.pubDate;
+    });
 
-  // Single dedup pass over the merged array
-  const deduped = deduplicate(allItems);
+    // Single dedup pass over the merged array
+    const deduped = deduplicate(allItems);
 
-  // PSX-relevant headlines first, others as padding
-  const relevant  = deduped.filter(h => h.isPSX || isPSXRelevant(h.title));
-  const fallback  = deduped.filter(h => !h.isPSX && !isPSXRelevant(h.title));
-  const finalList = [...relevant, ...fallback].slice(0, HEADLINE_LIMIT);
+    // PSX-relevant headlines first, others as padding
+    const relevant  = deduped.filter(h => h.isPSX || isPSXRelevant(h.title));
+    const fallback  = deduped.filter(h => !h.isPSX && !isPSXRelevant(h.title));
+    const finalList = [...relevant, ...fallback].slice(0, HEADLINE_LIMIT);
 
-  const totalFetched  = allItems.length;
-  const totalRelevant = relevant.length;
+    const totalFetched  = allItems.length;
+    const totalRelevant = relevant.length;
 
-  console.log(`✅ ${mettisResults.flat().length} Mettis + ${rssResults.flat().length} RSS = ${totalFetched} total (${totalRelevant} PSX-relevant) in ${Date.now() - startTime}ms`);
+    console.log(`✅ ${mettisResults.flat().length} Mettis + ${rssResults.flat().length} RSS = ${totalFetched} total (${totalRelevant} PSX-relevant) in ${Date.now() - startTime}ms`);
 
-  // AI analysis
-  const rawAI      = await analyzeWithGroq(finalList);
-  const aiAnalysis = rawAI
-    ? enrichWithTickers(rawAI)
-    : {
-        sentiment:       'NEUTRAL',
-        signal:          'HOLD',
-        impactScore:     0,
-        confidence:      0,
-        kse100Outlook:   'SIDEWAYS',
-        affectedSectors: [],
-        topTrades:       [],
-        keyRisk:         'AI analysis unavailable',
-        summary:         'AI offline — trade on technicals only',
-        immediateAction: 'Wait for AI to recover or use manual analysis',
-        _model:          'none',
-      };
+    // AI analysis
+    const rawAI      = await analyzeWithGroq(finalList);
+    const aiAnalysis = rawAI
+      ? enrichWithTickers(rawAI)
+      : {
+          sentiment:       'NEUTRAL',
+          signal:          'HOLD',
+          impactScore:     0,
+          confidence:      0,
+          kse100Outlook:   'SIDEWAYS',
+          affectedSectors: [],
+          topTrades:       [],
+          keyRisk:         'AI analysis unavailable',
+          summary:         'AI offline — trade on technicals only',
+          immediateAction: 'Wait for AI to recover or use manual analysis',
+          _model:          'none',
+        };
 
-  const result = {
-    headlines: finalList.map(h => ({
-      title:   h.title,
-      source:  h.source,
-      pubDate: h.pubDate instanceof Date ? h.pubDate.toISOString() : (h.pubDate || null),
-    })),
-    aiAnalysis,
-    signalMeta: signalMeta(aiAnalysis.signal),
-    meta: {
-      totalFetched,
-      uniqueHeadlines: deduped.length,
-      psxRelevant:     totalRelevant,
-      analyzedCount:   finalList.length,
-      fetchedAt:       new Date().toISOString(),
-      nextRefreshAt:   new Date(now + CACHE_TTL).toISOString(),
-    },
-  };
+    const result = {
+      headlines: finalList.map(h => ({
+        title:   h.title,
+        source:  h.source,
+        pubDate: h.pubDate instanceof Date ? h.pubDate.toISOString() : (h.pubDate || null),
+      })),
+      aiAnalysis,
+      signalMeta: signalMeta(aiAnalysis.signal),
+      meta: {
+        totalFetched,
+        uniqueHeadlines: deduped.length,
+        psxRelevant:     totalRelevant,
+        analyzedCount:   finalList.length,
+        fetchedAt:       new Date().toISOString(),
+        nextRefreshAt:   new Date(now + CACHE_TTL).toISOString(),
+      },
+    };
 
-  cache = { data: result, ts: now };
-  return result;
+    cache = { data: result, ts: now };
+    return result;
+  } catch (e) {
+    // FIX: Top-level safety net. If anything unexpected throws (network
+    // failure, JSON parse bug, memory issue), return the last cached
+    // result when available instead of crashing the caller with an
+    // unhandled rejection.
+    console.error('❌ getNewsImpact failed:', e.message);
+    if (cache.data) {
+      console.log('📦 Serving stale cache due to error');
+      return cache.data;
+    }
+    // No cache available — return a minimal safe structure so callers
+    // can destructure without null-checks.
+    const fallback = {
+      headlines: [],
+      aiAnalysis: {
+        sentiment: 'NEUTRAL', signal: 'HOLD', impactScore: 0, confidence: 0,
+        kse100Outlook: 'SIDEWAYS', affectedSectors: [], topTrades: [],
+        keyRisk: 'Service unavailable', summary: 'News fetch failed',
+        immediateAction: 'Check connection or retry', _model: 'none',
+      },
+      signalMeta: signalMeta('HOLD'),
+      meta: { totalFetched: 0, uniqueHeadlines: 0, psxRelevant: 0, analyzedCount: 0, fetchedAt: new Date().toISOString(), nextRefreshAt: new Date(now + CACHE_TTL).toISOString() },
+    };
+    return fallback;
+  }
 }
 
 async function getQuickSignal() {
-  const impact = await getNewsImpact();
-  const { aiAnalysis, signalMeta: meta } = impact;
-  return {
-    signal:          aiAnalysis.signal,
-    emoji:           meta.emoji,
-    sentiment:       aiAnalysis.sentiment,
-    impactScore:     aiAnalysis.impactScore,
-    confidence:      aiAnalysis.confidence,
-    immediateAction: aiAnalysis.immediateAction,
-    summary:         aiAnalysis.summary,
-    topTrades:       aiAnalysis.topTrades || [],
-    fetchedAt:       impact.meta.fetchedAt,
-  };
+  try {
+    const impact = await getNewsImpact();
+    const { aiAnalysis, signalMeta: meta } = impact;
+    return {
+      signal:          aiAnalysis.signal,
+      emoji:           meta.emoji,
+      sentiment:       aiAnalysis.sentiment,
+      impactScore:     aiAnalysis.impactScore,
+      confidence:      aiAnalysis.confidence,
+      immediateAction: aiAnalysis.immediateAction,
+      summary:         aiAnalysis.summary,
+      topTrades:       aiAnalysis.topTrades || [],
+      fetchedAt:       impact.meta.fetchedAt,
+    };
+  } catch (e) {
+    // FIX: If getNewsImpact somehow still throws (e.g., cache corruption),
+    // return a safe fallback so the caller in shariahService doesn't crash.
+    console.error('❌ getQuickSignal failed:', e.message);
+    return {
+      signal: 'HOLD', emoji: '🟡', sentiment: 'NEUTRAL',
+      impactScore: 0, confidence: 0,
+      immediateAction: 'Wait for data', summary: 'News service unavailable',
+      topTrades: [], fetchedAt: new Date().toISOString(),
+    };
+  }
 }
 
 module.exports = { getNewsImpact, getQuickSignal, SECTOR_TICKERS };
