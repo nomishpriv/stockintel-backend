@@ -6,70 +6,86 @@ const predictService = require('../services/predictService');
 const newsService = require('../services/newsService');
 const shariahTradeService = require('../services/shariahTradeService');
 const institutionalService = require('../services/institutionalActivityService');
+const orderFlowService = require('../services/orderFlowService');
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// FIX: Unified error response helper so every endpoint returns the same shape
+// on failure, making client-side error handling predictable.
+function errorRes(res, status, message) {
+  return res.status(status).json({ success: false, error: message });
+}
 
+// FIX: Unified success response helper for consistency.
+function successRes(res, data, extra = {}) {
+  return res.json({ success: true, ...extra, ...data });
+}
 
-// Get all stocks
+// ─── STOCKS ───────────────────────────────────────────────────────────────────
 router.get('/stocks', async (req, res) => {
   try {
     const stocks = await si.fetchAllStocks();
-    res.json({ success: true, count: stocks.length, data: stocks });
+    successRes(res, { data: stocks }, { count: stocks.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Get single stock
 router.get('/stocks/:symbol', async (req, res) => {
   try {
     const stock = await si.getStock(req.params.symbol);
-    if (!stock) return res.status(404).json({ success: false, error: 'Not found' });
-    res.json({ success: true, data: stock });
+    if (!stock) return errorRes(res, 404, 'Not found');
+    successRes(res, { data: stock });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Market summary
 router.get('/market/summary', async (req, res) => {
   try {
     const summary = await si.getSummary();
-    res.json({ success: true, data: summary });
+    successRes(res, { data: summary });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Search stocks
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q) return res.json({ success: true, data: [] });
+    if (!q || typeof q !== 'string') return successRes(res, { data: [] });
     const results = await si.searchStocks(q);
-    res.json({ success: true, count: results.length, data: results });
+    successRes(res, { data: results }, { count: results.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Top opportunities
 router.get('/opportunities', async (req, res) => {
   try {
     const { limit } = req.query;
-    const data = await si.getOpportunities(+limit || 10);
-    res.json({ success: true, count: data.length, data });
+    // FIX: Guard against NaN and negative limit so the API doesn't crash
+    // or return garbage when the client sends ?limit=abc or ?limit=-5.
+    const n = Number.isFinite(+limit) && +limit > 0 ? +limit : 10;
+    const data = await si.getOpportunities(n);
+    successRes(res, { data }, { count: data.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── SECTORS ──────────────────────────────────────────────────────────────────
 router.get('/sectors', async (req, res) => {
   try {
     const all = await si.fetchAllStocks();
+    if (!Array.isArray(all)) return errorRes(res, 500, 'Invalid stock data');
+
     const sectors = {};
-    
     for (const s of all) {
       if (!s.price) continue;
+      // FIX: Guard against missing or non-string name so .toLowerCase() doesn't
+      // throw when the API omits the company name field.
+      if (!s.name || typeof s.name !== 'string') continue;
+
       let sector = 'Other';
       const n = s.name.toLowerCase();
       if (n.includes('cement')) sector = 'Cement';
@@ -86,7 +102,7 @@ router.get('/sectors', async (req, res) => {
       else if (n.includes('chemical')) sector = 'Chemicals';
       else if (n.includes('glass')) sector = 'Glass';
       else if (n.includes('insurance')) sector = 'Insurance';
-      
+
       if (!sectors[sector]) sectors[sector] = { name: sector, count: 0, avgChange: 0 };
       sectors[sector].count++;
       sectors[sector].avgChange += s.changePercent;
@@ -97,85 +113,94 @@ router.get('/sectors', async (req, res) => {
       avgChange: +(s.avgChange / s.count).toFixed(2)
     })).sort((a, b) => b.avgChange - a.avgChange);
 
-    res.json({ success: true, data });
+    successRes(res, { data });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── SMC ──────────────────────────────────────────────────────────────────────
 router.get('/smc/:symbol', async (req, res) => {
   try {
     const signals = await smcService.getSMCSignals(req.params.symbol.toUpperCase());
-    res.json({ success: true, ...signals });
+    successRes(res, signals);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Create prediction for a stock
-router.get('/predict/:symbol', async (req, res) => {
-  try {
-    const stock = await si.getStock(req.params.symbol.toUpperCase());
-    if (!stock) return res.status(404).json({ success: false, error: 'Not found' });
-    const prediction = predictService.createPrediction(stock);
-    res.json({ success: true, ...prediction });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
+// ─── PREDICTIONS ──────────────────────────────────────────────────────────────
+// FIX: Added await on predictService.createPrediction. The old code called
+// the sync-looking function without await, but predictService.createPrediction
+// is now async (after the file-write fix). Without await the response would
+// be a Promise object instead of the actual prediction data.
 
-// Check predictions for a stock
-router.get('/predict/check/:symbol', async (req, res) => {
-  try {
-    const stock = await si.getStock(req.params.symbol.toUpperCase());
-    if (!stock) return res.status(404).json({ success: false, error: 'Not found' });
-    const result = predictService.checkPrediction(
-      stock.symbol, stock.price, stock.high, stock.low
-    );
-    res.json({ success: true, ...result });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
 
-// Get accuracy summary
-router.get('/predict/accuracy/:symbol', async (req, res) => {
-  try {
-    const summary = predictService.getAccuracySummary(req.params.symbol.toUpperCase());
-    res.json({ success: true, ...summary });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
+// FIX: Added await on predictService.checkPrediction for the same reason —
+// the function is now async and returns a Promise.
 
-// Get all accuracies
+
+
+// GENERAL route FIRST
 router.get('/predict/accuracy', async (req, res) => {
   try {
-    const results = predictService.getAllAccuracies();
+    const results = await predictService.getAllAccuracies();
     res.json({ success: true, data: results });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
-// GET /api/stats/daily — Today's signal performance
+// PARAMETERIZED route SECOND
+router.get('/predict/accuracy/:symbol', async (req, res) => {
+  try {
+    const summary = await predictService.getAccuracySummary(req.params.symbol.toUpperCase());
+    res.json({ success: true, ...summary });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+router.get('/predict/check/:symbol', async (req, res) => {
+  try {
+    const stock = await si.getStock(req.params.symbol);
+    if (!stock) return errorRes(res, 404, 'Not found');
+    const result = await predictService.checkPrediction(
+      stock.symbol, stock.price, stock.high, stock.low
+    );
+    successRes(res, result);
+  } catch (e) {
+    errorRes(res, 500, e.message);
+  }
+});
+
+router.get('/predict/:symbol', async (req, res) => {
+  try {
+    const stock = await si.getStock(req.params.symbol);
+    if (!stock) return errorRes(res, 404, 'Not found');
+    const prediction = await predictService.createPrediction(stock);
+    successRes(res, prediction);
+  } catch (e) {
+    errorRes(res, 500, e.message);
+  }
+});
+
+// FIX: Added await on predictService.getAllAccuracies — now async.
 router.get('/stats/daily', async (req, res) => {
   try {
-    const predictions = predictService.getAllAccuracies();
+    const predictions = await predictService.getAllAccuracies();
     const all = await si.fetchAllStocks();
-    
-    // Count today's signals
+    if (!Array.isArray(all)) return errorRes(res, 500, 'Invalid stock data');
+
     const buySignals = all.filter(s => s.signal === 'BUY').length;
     const sellSignals = all.filter(s => s.signal === 'SELL').length;
-    const highVolStocks = all.filter(s => s.volume > s.volAvg10d * 1.5).length;
-    
-    // Count successful predictions
+    const highVolStocks = all.filter(s => s.volAvg10d > 0 && s.volume > s.volAvg10d * 1.5).length;
+
     const totalPivot = predictions.reduce((sum, p) => sum + (p.pivotAccuracy || 0), 0);
     const totalATR = predictions.reduce((sum, p) => sum + (p.atrAccuracy || 0), 0);
     const count = predictions.length || 1;
-    
-    res.json({
-      success: true,
+
+    successRes(res, {
       data: {
         totalStocks: all.length,
         buySignals,
@@ -187,34 +212,36 @@ router.get('/stats/daily', async (req, res) => {
       }
     });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// POST /api/predict/batch — Create predictions for top opportunities
+// FIX: Added await on predictService.createPrediction inside the loop.
+// Also added a guard so opps is an array before iterating.
 router.post('/predict/batch', async (req, res) => {
   try {
     const opps = await si.getOpportunities(10);
+    if (!Array.isArray(opps)) return errorRes(res, 500, 'Invalid opportunities data');
+
     const results = [];
-    
     for (const opp of opps) {
-      const prediction = predictService.createPrediction(opp);
+      const prediction = await predictService.createPrediction(opp);
       results.push({ symbol: opp.symbol, ...prediction });
     }
-    
-    res.json({ success: true, created: results.length, data: results });
+
+    successRes(res, { data: results }, { created: results.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// GET /api/stats/daily-report — Full daily performance report
+// ─── DAILY REPORT ─────────────────────────────────────────────────────────────
 router.get('/stats/daily-report', async (req, res) => {
   try {
     const fs = require('fs');
     const path = require('path');
     const PREDICT_FILE = path.join(__dirname, '..', '.predictions.json');
-    
+
     let allPredictions = {};
     try {
       if (fs.existsSync(PREDICT_FILE)) {
@@ -232,6 +259,10 @@ router.get('/stats/daily-report', async (req, res) => {
     let totalATRWins = 0, totalATRLosses = 0;
 
     for (const [symbol, predictions] of Object.entries(allPredictions)) {
+      // FIX: Guard against non-array predictions so .filter() doesn't throw
+      // when the JSON file is corrupted or manually edited.
+      if (!Array.isArray(predictions)) continue;
+
       const completed = predictions.filter(p => p.checked);
       const pivotWins = completed.filter(p => p.pivot?.result === 'WIN').length;
       const pivotLosses = completed.filter(p => p.pivot?.result === 'LOSS').length;
@@ -262,86 +293,91 @@ router.get('/stats/daily-report', async (req, res) => {
         : 'NONE'
     };
 
-    res.json({ success: true, report });
+    successRes(res, { report });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
 router.get('/news/impact', async (req, res) => {
   try {
     const { forceRefresh } = req.query;
     const data = await newsService.getNewsImpact({ forceRefresh: forceRefresh === 'true' });
-    res.json({ success: true, ...data });
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Quick signal for dashboard widget
 router.get('/news/signal', async (req, res) => {
   try {
     const data = await newsService.getQuickSignal();
-    res.json({ success: true, ...data });
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── KSE100 ───────────────────────────────────────────────────────────────────
 router.get('/kse100/volume', async (req, res) => {
   try {
     const data = await si.getKSE100Volume();
-    if (!data) return res.status(404).json({ success: false, error: 'KSE100 data not available' });
-    res.json({ success: true, ...data });
+    if (!data) return errorRes(res, 404, 'KSE100 data not available');
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
 router.get('/kse100/volume-speed', async (req, res) => {
   try {
     const data = await si.getVolumeSpeed();
-    if (!data) return res.status(404).json({ success: false, error: 'Data not available' });
-    res.json({ success: true, ...data });
+    if (!data) return errorRes(res, 404, 'Data not available');
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-const orderFlowService = require('../services/orderFlowService');
-
+// ─── ORDER FLOW ───────────────────────────────────────────────────────────────
+// FIX: Added await on orderFlowService.analyzeRatio — the function is now
+// async after the file-write / batch fix. Without await the response would
+// be a Promise instead of the analysis object.
 router.get('/orderflow/:symbol', async (req, res) => {
   try {
-    const analysis = orderFlowService.analyzeRatio(req.params.symbol.toUpperCase());
-    res.json({ success: true, ...analysis });
+    const analysis = await orderFlowService.analyzeRatio(req.params.symbol.toUpperCase());
+    successRes(res, analysis);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── SHARIAH ──────────────────────────────────────────────────────────────────
 router.get('/shariah/trades', async (req, res) => {
   try {
     const data = await shariahTradeService.getShariahTradeRecommendations();
-    res.json({ success: true, ...data });
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
+// ─── INSTITUTIONAL ────────────────────────────────────────────────────────────
 router.get('/institutional', async (req, res) => {
   try {
     const data = await institutionalService.analyzeInstitutionalActivity();
-    if (!data) return res.status(404).json({ success: false, error: 'Data not available' });
-    res.json({ success: true, ...data });
+    if (!data) return errorRes(res, 404, 'Data not available');
+    successRes(res, data);
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    errorRes(res, 500, e.message);
   }
 });
 
-// Clear cache
+// ─── CACHE ────────────────────────────────────────────────────────────────────
 router.post('/cache/clear', async (req, res) => {
   si.clearCache();
-  res.json({ success: true, message: 'Cache cleared' });
+  successRes(res, { message: 'Cache cleared' });
 });
 
 module.exports = router;
