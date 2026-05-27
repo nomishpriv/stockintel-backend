@@ -7,6 +7,8 @@ const newsService = require('../services/newsService');
 const shariahTradeService = require('../services/shariahTradeService');
 const institutionalService = require('../services/institutionalActivityService');
 const orderFlowService = require('../services/orderFlowService');
+const resultService = require('../services/resultAnnouncementService');
+
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 // FIX: Unified error response helper so every endpoint returns the same shape
@@ -369,6 +371,24 @@ router.get('/institutional', async (req, res) => {
     const data = await institutionalService.analyzeInstitutionalActivity();
     if (!data) return errorRes(res, 404, 'Data not available');
     successRes(res, data);
+  } catch (e) {
+    errorRes(res, 500, e.message);
+  }
+});
+
+router.get('/results/today', async (req, res) => {
+  try {
+    const data = await resultService.getTodayResultImpact();
+    successRes(res, data);
+  } catch (e) {
+    errorRes(res, 500, e.message);
+  }
+});
+
+router.get('/results/:symbol', async (req, res) => {
+  try {
+    const data = await resultService.getStockResult(req.params.symbol.toUpperCase());
+    successRes(res, { data });
   } catch (e) {
     errorRes(res, 500, e.message);
   }
