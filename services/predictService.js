@@ -81,9 +81,29 @@ async function saveState(state) {
 // ========== MARKET HOURS (PKT = UTC+5) ==========
 function isMarketOpen() {
   const pkt  = new Date(Date.now() + 5 * 60 * 60 * 1000);
-  const day  = pkt.getUTCDay();                          // 0=Sun, 6=Sat
-  const time = pkt.getUTCHours() + pkt.getUTCMinutes() / 60;
-  return day >= 1 && day <= 5 && time >= 9.5 && time <= 15.5;
+  const day  = pkt.getUTCDay();  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  const hour = pkt.getUTCHours();
+  const min  = pkt.getUTCMinutes();
+  const time = hour + min / 60;
+
+  // Sunday & Saturday — closed
+  if (day === 0 || day === 6) return false;
+
+  // Monday to Thursday — 9:30 AM to 3:30 PM (continuous)
+  if (day >= 1 && day <= 4) {
+    return time >= 9.5 && time <= 15.5;
+  }
+
+  // Friday — two sessions with a break
+  // Session 1: 9:15 AM to 12:00 PM
+  // Session 2: 2:30 PM to 4:30 PM
+  if (day === 5) {
+    const session1 = time >= 9.25 && time <= 12.0;   // 9:15 AM – 12:00 PM
+    const session2 = time >= 14.5 && time <= 16.5;   // 2:30 PM – 4:30 PM
+    return session1 || session2;
+  }
+
+  return false;
 }
 
 // ========== ATR (True Range, single-candle approximation) ==========
