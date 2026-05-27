@@ -1,0 +1,326 @@
+{
+  "LUCK": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 436.77,
+        "target": 440.18,
+        "stopLoss": 431.68,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:51:59.585Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:52:39.097Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 436.77,
+        "target": 469.51,
+        "stopLoss": 412.21,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:51:59.585Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:52:39.097Z"
+    }
+  ],
+  "DGKC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 193.33,
+        "target": 195.46,
+        "stopLoss": 189.59,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:04.094Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:52:39.096Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 193.33,
+        "target": 213.75,
+        "stopLoss": 178.01,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:04.094Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:52:39.096Z"
+    }
+  ],
+  "MEBL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 490.2,
+        "target": 494.8,
+        "stopLoss": 483.8,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:10.191Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:52:39.097Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 490.2,
+        "target": 517.08,
+        "stopLoss": 470.04,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:10.191Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:52:39.097Z"
+    }
+  ],
+  "FFC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 541.73,
+        "target": 545.02,
+        "stopLoss": 537.22,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:13.533Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:52:39.096Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 541.73,
+        "target": 566.91,
+        "stopLoss": 522.85,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:13.533Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:52:39.096Z"
+    }
+  ],
+  "OGDC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 330.05,
+        "target": 331.74,
+        "stopLoss": 327.54,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:16.378Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:52:39.097Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 330.05,
+        "target": 344.83,
+        "stopLoss": 318.97,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:16.378Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:52:39.097Z"
+    }
+  ],
+  "EFERT": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 202.46,
+        "target": 205.98,
+        "stopLoss": 199.98,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.120Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-27T18:53:51.713Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 202.46,
+        "target": 214.46,
+        "stopLoss": 193.46,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.120Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "WIN",
+      "hitAt": "2026-05-27T18:53:51.713Z"
+    }
+  ],
+  "HUBC": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 219.5,
+        "target": 221.69,
+        "stopLoss": 216.6,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.129Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:53:51.715Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 219.5,
+        "target": 230.66,
+        "stopLoss": 211.13,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.129Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:53:51.715Z"
+    }
+  ],
+  "MARI": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 658.52,
+        "target": 663.72,
+        "stopLoss": 651.62,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.134Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:53:51.716Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 658.52,
+        "target": 695.4,
+        "stopLoss": 630.86,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.134Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:53:51.716Z"
+    }
+  ],
+  "MLCF": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 89.38,
+        "target": 90.44,
+        "stopLoss": 87.75,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.139Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:53:51.716Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 89.38,
+        "target": 100.44,
+        "stopLoss": 81.08,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.139Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:53:51.716Z"
+    }
+  ],
+  "POL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 659.82,
+        "target": 662.6,
+        "stopLoss": 657.16,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.144Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-27T18:53:51.717Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 659.82,
+        "target": 670.7,
+        "stopLoss": 651.66,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.144Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "WIN",
+      "hitAt": "2026-05-27T18:53:51.717Z"
+    }
+  ],
+  "PPL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 240.73,
+        "target": 242.32,
+        "stopLoss": 238.82,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.147Z",
+        "checked": true,
+        "result": "LOSS",
+        "hitAt": "2026-05-27T18:53:51.717Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 240.73,
+        "target": 254.21,
+        "stopLoss": 230.62,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.147Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "LOSS",
+      "hitAt": "2026-05-27T18:53:51.717Z"
+    }
+  ],
+  "SEARL": [
+    {
+      "pivot": {
+        "method": "PIVOT",
+        "entry": 90.31,
+        "target": 91.62,
+        "stopLoss": 89.33,
+        "confidence": 70,
+        "createdAt": "2026-05-27T18:52:39.150Z",
+        "checked": true,
+        "result": "WIN",
+        "hitAt": "2026-05-27T18:53:51.717Z"
+      },
+      "atr": {
+        "method": "ATR",
+        "entry": 90.31,
+        "target": 97.89,
+        "stopLoss": 84.63,
+        "confidence": 65,
+        "createdAt": "2026-05-27T18:52:39.150Z",
+        "checked": false
+      },
+      "checked": true,
+      "result": "WIN",
+      "hitAt": "2026-05-27T18:53:51.717Z"
+    }
+  ]
+}

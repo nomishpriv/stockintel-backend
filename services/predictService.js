@@ -4,6 +4,18 @@ const path = require('path');
 const PREDICT_FILE = path.join(__dirname, '..', '.predictions.json');
 const STATE_FILE   = path.join(__dirname, '..', '.predict-state.json');
 
+// ========== TEST MODE CONFIG — Change only these ==========
+const TEST_MODE = false;           // true=testing, false=production
+const TEST_MIN_RR = 0.5;         // R:R threshold for testing
+const PROD_MIN_RR = 1;           // R:R threshold for production
+const TEST_MIN_COMPLETED = 1;    // Min predictions for accuracy (testing)
+const PROD_MIN_COMPLETED = 3;    // Min predictions for accuracy (production)
+
+// Derived config — don't change
+const MIN_RR = TEST_MODE ? TEST_MIN_RR : PROD_MIN_RR;
+const MIN_COMPLETED = TEST_MODE ? TEST_MIN_COMPLETED : PROD_MIN_COMPLETED;
+// =============================================================
+
 // FIX: Promise caches so concurrent loads share one disk read instead of
 // hammering the filesystem when checkPrediction is called in a tight loop
 // (e.g., 500+ times per fetch cycle).
@@ -80,6 +92,9 @@ async function saveState(state) {
 
 // ========== MARKET HOURS (PKT = UTC+5) ==========
 function isMarketOpen() {
+  // TEST_MODE: bypass market hours check
+  if (TEST_MODE) return true;
+
   const pkt  = new Date(Date.now() + 5 * 60 * 60 * 1000);
   const day  = pkt.getUTCDay();  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   const hour = pkt.getUTCHours();
@@ -216,10 +231,10 @@ async function createPrediction(stock) {
   if (targetPct > 5)
     return { skipped: true, reason: `Target too far (${targetPct.toFixed(1)}%) — unrealistic for intraday` };
 
-  // R:R ratio gate — minimum 1:1 required
+  // R:R ratio gate — uses TEST_MODE threshold
   const reward = pivotTarget - price;
   const risk   = price - pivotStop;
-  if (risk <= 0 || reward / risk < 1)
+  if (risk <= 0 || reward / risk < MIN_RR)
     return { skipped: true, reason: `Poor R:R (${risk > 0 ? (reward / risk).toFixed(2) : 'n/a'}) — skip` };
 
   const pivotConfidence = r1 > price ? 70 : 50;
@@ -270,17 +285,17 @@ async function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
   const stockPreds = all[symbol] || [];
   let updated      = false;
 
-  // FIX: Guard against invalid high/low data (0 or missing) which would
-  // cause currentLow <= stopLoss to fire immediately and falsely record
-  // a LOSS when the API simply didn't send high/low values.
-  const hasValidHL = currentHigh > 0 && currentLow > 0 && currentHigh >= currentLow;
+  // TEST_MODE: bypass high/low validation. Production: validate properly.
+  const hasValidHL = TEST_MODE ? true : (currentHigh > 0 && currentLow > 0 && currentHigh >= currentLow);
 
   for (const pred of stockPreds) {
     if (pred.checked) continue;
 
-    // Must be at least 60 seconds old before resolving
-    const age = Date.now() - new Date(pred.pivot.createdAt).getTime();
-    if (age < 60000) continue;
+    // Production: must be at least 60 seconds old before resolving. Test: check immediately.
+    if (!TEST_MODE) {
+      const age = Date.now() - new Date(pred.pivot.createdAt).getTime();
+      if (age < 60000) continue;
+    }
 
     // Check PIVOT method
     if (!pred.pivot.checked && hasValidHL) {
@@ -288,11 +303,19 @@ async function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
         pred.pivot.result  = 'WIN';
         pred.pivot.checked = true;
         pred.pivot.hitAt   = new Date().toISOString();
+        // Mark parent as resolved when pivot resolves
+        pred.checked = true;
+        pred.result  = 'WIN';
+        pred.hitAt   = pred.pivot.hitAt;
         updated = true;
       } else if (currentLow <= pred.pivot.stopLoss) {
         pred.pivot.result  = 'LOSS';
         pred.pivot.checked = true;
         pred.pivot.hitAt   = new Date().toISOString();
+        // Mark parent as resolved when pivot resolves
+        pred.checked = true;
+        pred.result  = 'LOSS';
+        pred.hitAt   = pred.pivot.hitAt;
         updated = true;
       }
     }
@@ -303,22 +326,23 @@ async function checkPrediction(symbol, currentPrice, currentHigh, currentLow) {
         pred.atr.result  = 'WIN';
         pred.atr.checked = true;
         pred.atr.hitAt   = new Date().toISOString();
+        if (!pred.checked) {
+          pred.checked = true;
+          pred.result  = 'WIN';
+          pred.hitAt   = pred.atr.hitAt;
+        }
         updated = true;
       } else if (currentLow <= pred.atr.stopLoss) {
         pred.atr.result  = 'LOSS';
         pred.atr.checked = true;
         pred.atr.hitAt   = new Date().toISOString();
+        if (!pred.checked) {
+          pred.checked = true;
+          pred.result  = 'LOSS';
+          pred.hitAt   = pred.atr.hitAt;
+        }
         updated = true;
       }
-    }
-
-    // Roll up parent fields when both methods are resolved
-    if (pred.pivot.checked && pred.atr.checked) {
-      pred.checked = true;
-      // WIN if either method hit target; LOSS only if both lost
-      pred.result = (pred.pivot.result === 'WIN' || pred.atr.result === 'WIN') ? 'WIN' : 'LOSS';
-      pred.hitAt  = pred.pivot.hitAt || pred.atr.hitAt || new Date().toISOString();
-      updated = true;
     }
   }
 
@@ -402,7 +426,7 @@ async function getAllAccuracies() {
     summaries.push(await getAccuracySummary(symbol));
   }
   return summaries
-    .filter(r => r.totalCompleted >= 3)
+    .filter(r => r.totalCompleted >= MIN_COMPLETED)
     .sort((a, b) => (b.pivotAccuracy || 0) - (a.pivotAccuracy || 0));
 }
 
