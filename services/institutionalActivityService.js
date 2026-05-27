@@ -7,7 +7,6 @@ const { getToken } = require('./stockIntelService');
 
 // ========== FETCH HISTORICAL KSE-100 BARS ==========
 async function fetchKSE100History(days = 20) {
-  // FIX: Guard against nonsensical input that would produce invalid timestamps.
   if (!Number.isFinite(days) || days <= 0) days = 20;
 
   const now = Math.floor(Date.now() / 1000);
@@ -16,16 +15,54 @@ async function fetchKSE100History(days = 20) {
   try {
     const token = await getToken();
 
+    // Get historical daily bars (for stats)
     const barsRes = await axios.get('https://app.stockintel.com/api/market/bars', {
       params: { symbol: 'KSE100', from, to: now, freq: '1D' },
       headers: { Authorization: `Bearer ${token}` },
       timeout: 10000
     });
-    return barsRes.data?.data || [];
+    const historicalBars = barsRes.data?.data || [];
+
+    // Get live KSE-100 data from the main market API (works during market hours)
+    let liveBar = null;
+    try {
+      const marketRes = await axios.get('https://app.stockintel.com/api/market', {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
+      });
+      const kseData = marketRes.data?.data?.in?.KSE100;
+      if (kseData && kseData.v > 0) {
+        liveBar = {
+          time: Math.floor(Date.now() / 1000),
+          open: +kseData.o || 0,
+          high: +kseData.h || 0,
+          low: +kseData.l || 0,
+          close: +kseData.c || 0,
+          volume: +kseData.v || 0
+        };
+      }
+    } catch {}
+
+    // If we have a live bar and it's not already in historical bars (same day)
+    if (liveBar && liveBar.volume > 0) {
+      const lastHistorical = historicalBars[historicalBars.length - 1];
+      const liveDate = new Date(liveBar.time * 1000).toDateString();
+      const lastHistDate = lastHistorical ? new Date(lastHistorical.time * 1000).toDateString() : '';
+
+      // Only add live bar if it's a new day or has more volume (intraday update)
+      if (liveDate !== lastHistDate || liveBar.volume > (lastHistorical?.volume || 0) * 1.1) {
+        if (liveDate === lastHistDate && lastHistorical) {
+          // Replace the last bar with live data (same day, newer)
+          historicalBars[historicalBars.length - 1] = liveBar;
+        } else {
+          // New day, add it
+          historicalBars.push(liveBar);
+        }
+      }
+    }
+
+    return historicalBars;
   } catch (e) {
-    // FIX: Return empty array instead of letting the exception bubble up and
-    // crash the caller. The upstream analyzeInstitutionalActivity already
-    // checks for < 10 bars and will return null gracefully.
     console.error('❌ fetchKSE100History failed:', e.response?.status || e.message);
     return [];
   }
