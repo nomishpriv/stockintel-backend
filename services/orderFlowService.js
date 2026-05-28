@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const RESET_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const MAX_SNAPSHOTS = 15; // 1 snapshot per minute for 15 min
+
 const ORDER_FLOW_FILE = path.join(__dirname, '..', '.orderflow.json');
 
 // FIX: Promise cache so concurrent loads share one disk read instead of
@@ -60,8 +63,8 @@ async function recordSnapshot(symbol, bidVolume, askVolume, bidPrice, askPrice, 
   const now = Date.now();
 
   // Reset every 30 minutes
-  if (now - stock.lastReset > 1800000) {
-    stock.lastReset = now;
+if (now - stock.lastReset > 900000) {   // 15 minutes
+      stock.lastReset = now;
     stock.snapshots = [];
   }
 
@@ -191,7 +194,7 @@ async function recordFromStocks(stocks) {
     const entry = all[symbol];
 
     // Reset every 30 minutes
-    if (now - entry.lastReset > 1800000) {
+    if (now - entry.lastReset >  RESET_INTERVAL) {
       entry.lastReset = now;
       entry.snapshots = [];
     }
@@ -207,9 +210,9 @@ async function recordFromStocks(stocks) {
       spread: stock.bidPrice > 0 ? +(((stock.askPrice - stock.bidPrice) / stock.bidPrice) * 100).toFixed(2) : 0
     });
 
-    if (entry.snapshots.length > 30) {
-      entry.snapshots = entry.snapshots.slice(-30);
-    }
+    if (entry.snapshots.length > MAX_SNAPSHOTS) {
+  entry.snapshots = entry.snapshots.slice(-MAX_SNAPSHOTS);
+}
   }
 
   await saveOrderFlow(all);
