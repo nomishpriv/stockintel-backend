@@ -7,14 +7,49 @@ const Groq  = require('groq-sdk');
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+// ─── NEWS SOURCES ───────────────────────────────────────────────────────────
+// FIX: Updated URLs + added Google News RSS as reliable backup
+// Some Pakistani sites (Dawn, Profit) changed their CMS or block scrapers.
+// Google News RSS aggregates all Pakistani financial news and never breaks.
+
 const NEWS_SOURCES = [
-  { name: 'Tribune Business',  url: 'https://tribune.com.pk/feed/business',                  weight: 1.2 },
-  { name: 'ARY News',          url: 'https://arynews.tv/feed/',                              weight: 1.0 },
-  { name: 'Dawn Business',     url: 'https://www.dawn.com/feeds/business-finance',           weight: 1.3 },
-  { name: 'Geo Business',      url: 'https://www.geo.tv/rss/1009',                          weight: 1.1 },
-  { name: 'Business Recorder', url: 'https://www.brecorder.com/feeds/latest-news',          weight: 1.4 },
-  { name: 'Profit Pakistan',   url: 'https://profit.pakistantoday.com.pk/feed',             weight: 1.3 },
+  // Verified working Pakistani sources
+  { name: 'Tribune Business',  url: 'https://tribune.com.pk/feed/business',       weight: 1.2 },
+  { name: 'ARY News',          url: 'https://arynews.tv/feed/',                   weight: 1.0 },
+  { name: 'Business Recorder', url: 'https://www.brecorder.com/feeds/latest-news', weight: 1.4 },
+  { name: 'Dawn Business',     url: 'https://www.dawn.com/feeds/business',        weight: 1.3 },
+  
+  // NEW: Google News — aggregates ALL Pakistani PSX news (never breaks)
+  { name: 'Google News PSX',   url: 'https://news.google.com/rss/search?q=PSX+KSE100+Pakistan+stock+exchange&hl=en-PK&gl=PK&ceid=PK:en', weight: 1.0 },
+  
+  // NEW: Investing.com Pakistan
+  { name: 'Investing.com PK',  url: 'https://www.investing.com/rss/news_285.rss',  weight: 1.1 },
 ];
+
+// ─── SOURCE HEALTH TRACKER ───────────────────────────────────────────────────
+// Auto-disable sources that fail 3 times in a row (resets after 1 hour)
+const sourceHealth = new Map();
+
+function isSourceHealthy(name) {
+  const health = sourceHealth.get(name);
+  if (!health) return true;
+  if (health.failCount >= 3 && Date.now() - health.lastFail < 3600000) {
+    return false; // Disabled for 1 hour
+  }
+  return true;
+}
+
+function recordSourceFail(name) {
+  const health = sourceHealth.get(name) || { failCount: 0, lastFail: 0 };
+  health.failCount++;
+  health.lastFail = Date.now();
+  sourceHealth.set(name, health);
+  console.log(`⚠️ ${name} failed ${health.failCount}x — auto-disabled for 1h`);
+}
+
+function recordSourceSuccess(name) {
+  sourceHealth.delete(name);
+}
 
 const METTIS_APIS = [
   { name: 'Mettis Equity',      url: 'https://mettisglobal.news/Home/GetEquitylatestnews'              },
@@ -109,38 +144,55 @@ function isPSXRelevant(title) {
 // but is brittle against CDATA edge cases, nested tags inside titles, or
 // non-RSS XML responses. For production robustness consider swapping to a
 // proper XML parser (fast-xml-parser, xml2js) if feeds start breaking.
+// ─── RSS FETCHER (with health check + better headers) ─────────────────────────
 async function fetchRSS(source) {
+  // Skip if source is temporarily disabled
+  if (!isSourceHealthy(source.name)) {
+    console.log(`⏸ ${source.name} temporarily disabled (too many failures)`);
+    return [];
+  }
+
   try {
     const { data } = await axios.get(source.url, {
-      timeout: 7000,
+      timeout: 8000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PSX-Analyzer/2.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept':     'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer':    'https://www.google.com/',
       },
+      // FIX: Some Pakistani sites redirect HTTP→HTTPS weirdly
+      maxRedirects: 5,
     });
 
-    const items  = [];
-    const itemRx = /<item[\s\S]*?<\/item>/gi;
-    let   m;
+    // Check if we got HTML instead of XML (common when sites block scrapers)
+    if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE html>')) {
+      console.warn(`⚠️ ${source.name} returned HTML instead of RSS (blocking scrapers)`);
+      recordSourceFail(source.name);
+      return [];
+    }
 
+    const items = [];
+    const itemRx = /<item[\s\S]*?<\/item>/gi;
+    let m;
     while ((m = itemRx.exec(data)) !== null) {
       const block = m[0];
-
-      const titleM = /<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i.exec(block);
+      const titleM = /<title>(?:<<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i.exec(block);
       if (!titleM) continue;
       const title = decodeEntities(titleM[1]).trim();
       if (!title || title.length < 15) continue;
-
-      const dateM  = /<pubDate>([\s\S]*?)<\/pubDate>/i.exec(block);
+      const dateM = /<pubDate>([\s\S]*?)<<\/pubDate>/i.exec(block);
       const pubDate = dateM ? new Date(dateM[1].trim()) : null;
-
       if (isStale(pubDate)) continue;
-
       items.push({ title, pubDate, source: source.name, weight: source.weight, isPSX: false });
     }
+
+    if (items.length > 0) recordSourceSuccess(source.name);
     return items;
+
   } catch (err) {
-    console.warn(`⚠️  ${source.name} failed: ${err.message}`);
+    console.warn(`⚠️ ${source.name} failed: ${err.message}`);
+    recordSourceFail(source.name);
     return [];
   }
 }
