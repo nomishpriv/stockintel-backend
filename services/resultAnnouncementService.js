@@ -1,3 +1,4 @@
+// resultAnnouncementService
 const axios = require('axios');
 const { getToken } = require('./stockIntelService');
 

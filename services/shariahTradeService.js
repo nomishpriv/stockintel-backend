@@ -1,3 +1,4 @@
+// shariahTradeService
 const si = require('./stockIntelService');
 const newsService = require('./newsService');
 

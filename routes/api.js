@@ -8,6 +8,7 @@ const shariahTradeService = require('../services/shariahTradeService');
 const institutionalService = require('../services/institutionalActivityService');
 const orderFlowService = require('../services/orderFlowService');
 const resultService = require('../services/resultAnnouncementService');
+const { getUnifiedSignal, getUnifiedSignalsForStocks } = require('../services/unifiedSignalService');
 
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -391,6 +392,29 @@ router.get('/results/:symbol', async (req, res) => {
     successRes(res, { data });
   } catch (e) {
     errorRes(res, 500, e.message);
+  }
+});
+
+// Single stock super signal
+router.get('/unified-signal/:symbol', async (req, res) => {
+  try {
+    const data = await getUnifiedSignal(req.params.symbol);
+    if (!data) return res.status(404).json({ success: false, message: 'Stock not found' });
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// Bulk for watchlist / top picks (optional)
+router.post('/unified-signals', async (req, res) => {
+  try {
+    const { symbols } = req.body;
+    if (!Array.isArray(symbols)) return res.status(400).json({ success: false, message: 'symbols array required' });
+    const data = await getUnifiedSignalsForStocks(symbols);
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
