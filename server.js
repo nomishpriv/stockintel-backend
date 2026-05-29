@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5001;
 
 const cron = require('node-cron');
 const { sendAlerts } = require('./services/alertService');
-
+const { createKMI30Predictions, checkKMI30Predictions } = require('./services/kmi30PredictService');
 
 // Middleware
 app.use(cors());
@@ -28,6 +28,14 @@ app.get('/health', (req, res) => {
 cron.schedule('*/15 * * * *', async () => {
   console.log('⏰ Alert cycle triggered:', new Date().toISOString());
   await sendAlerts();
+});
+
+// KMI-30 Intraday Scanner: every 15 minutes
+cron.schedule('*/15 * * * *', async () => {
+  if (!isMarketOpen()) return;
+  console.log('🔥 KMI-30 scan triggered:', new Date().toISOString());
+  await createKMI30Predictions();
+  await checkKMI30Predictions();
 });
 
 // Start

@@ -11,6 +11,7 @@ const resultService = require('../services/resultAnnouncementService');
 const { getUnifiedSignal, getUnifiedSignalsForStocks } = require('../services/unifiedSignalService');
 const alertService = require('../services/alertService');
 const alertLogger  = require('../services/alertLoggerService');
+const kmi30Service = require('../services/kmi30PredictService');
 
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -442,10 +443,12 @@ router.get('/alerts/test', async (req, res) => {
 });
 
 // Mobile page
+
 router.get('/alerts/mobile', async (req, res) => {
   try {
     const latest = await alertLogger.getLatest();
     const logs   = await alertLogger.getLogs(20);
+    const kmi30  = await kmi30Service.scanKMI30().catch(() => []);
     const timePKT = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
 
     const html = `<!DOCTYPE html>
@@ -481,6 +484,23 @@ router.get('/alerts/mobile', async (req, res) => {
     .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
     .badge.ok { background: #22c55e20; color: #22c55e; }
     .badge.no { background: #f59e0b20; color: #f59e0b; }
+    
+    /* KMI-30 Section */
+    .kmi30-box { background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 14px; border-left: 4px solid #a855f7; }
+    .kmi30-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .kmi30-title { font-size: 13px; font-weight: 700; color: #a855f7; }
+    .kmi30-count { font-size: 11px; background: #a855f720; color: #a855f7; padding: 2px 8px; border-radius: 10px; }
+    .kmi30-item { border-top: 1px solid #334155; padding: 10px 0; }
+    .kmi30-item:first-of-type { border-top: none; }
+    .kmi30-symbol { font-size: 14px; font-weight: 700; color: #e2e8f0; }
+    .kmi30-levels { font-size: 12px; color: #94a3b8; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .kmi30-levels span { white-space: nowrap; }
+    .kmi30-entry { color: #22c55e; font-weight: 600; }
+    .kmi30-target { color: #3b82f6; font-weight: 600; }
+    .kmi30-sl { color: #ef4444; font-weight: 600; }
+    .kmi30-rr { color: #f59e0b; font-weight: 600; }
+    .kmi30-rationale { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4; }
+    .kmi30-score { font-size: 10px; color: #94a3b8; margin-top: 2px; }
     
     .history { margin-top: 10px; }
     .history h2 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
@@ -526,6 +546,28 @@ router.get('/alerts/mobile', async (req, res) => {
     </div>
     <pre id="alertText">${latest ? latest.message : 'Waiting for first alert...'}</pre>
   </div>
+
+  ${kmi30.length > 0 ? `
+  <div class="kmi30-box">
+    <div class="kmi30-header">
+      <div class="kmi30-title">🔥 KMI-30 Intraday (15min)</div>
+      <div class="kmi30-count">${kmi30.length} setups</div>
+    </div>
+    ${kmi30.map(p => `
+      <div class="kmi30-item">
+        <div class="kmi30-symbol">${p.symbol} <span style="font-size:11px;color:#94a3b8;font-weight:400">${p.name}</span></div>
+        <div class="kmi30-levels">
+          <span class="kmi30-entry">E: ₨${p.entry.toFixed(2)}</span>
+          <span class="kmi30-target">T: ₨${p.target.toFixed(2)}</span>
+          <span class="kmi30-sl">SL: ₨${p.stopLoss.toFixed(2)}</span>
+          <span class="kmi30-rr">RR: ${p.riskReward}x</span>
+        </div>
+        <div class="kmi30-rationale">${p.rationale}</div>
+        <div class="kmi30-score">Score: ${p.score}/15 | RSI: ${Math.round(p.rsi)} | Vol: ${(p.volume/1000).toFixed(0)}K</div>
+      </div>
+    `).join('')}
+  </div>
+  ` : ''}
 
   <div class="history" id="history">
     <h2>📜 Recent Cycles <span style="font-weight:400;color:#64748b;font-size:12px">(tap to expand)</span></h2>
@@ -601,7 +643,6 @@ router.get('/alerts/mobile', async (req, res) => {
           status.textContent = '✅ Alert sent! Reloading...';
           status.className = 'status ok';
           if (json.data?.alerts?.length > 0) playBeep();
-          // Reload page after 1s to show fresh data
           setTimeout(() => window.location.reload(), 1000);
         } else {
           status.textContent = '❌ Failed: ' + (json.error || 'Unknown');
@@ -615,7 +656,6 @@ router.get('/alerts/mobile', async (req, res) => {
       }
     }
 
-    // Background check for new alerts (no full page reload)
     setInterval(() => {
       fetch('/api/alerts/latest')
         .then(r => r.json())
@@ -624,7 +664,6 @@ router.get('/alerts/mobile', async (req, res) => {
           if (newId && newId !== lastId) {
             lastId = newId;
             if (data.latest.count > 0) playBeep();
-            // Update badge and text without reload
             document.getElementById('badge').textContent = data.latest.count > 0 
               ? '🔥 ' + data.latest.count + ' PICKS' 
               : '⏸ NO PICKS';
@@ -643,6 +682,46 @@ router.get('/alerts/mobile', async (req, res) => {
     res.send(html);
   } catch (e) {
     res.status(500).send('Error loading alerts');
+  }
+});
+
+// Get current KMI-30 picks
+router.get('/kmi30/picks', async (req, res) => {
+  try {
+    const picks = await kmi30Service.scanKMI30();
+    res.json({ success: true, data: picks, count: picks.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Get active + completed predictions
+router.get('/kmi30/predictions', async (req, res) => {
+  try {
+    const summary = await kmi30Service.checkKMI30Predictions();
+    res.json({ success: true, data: summary });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Get accuracy stats
+router.get('/kmi30/accuracy', async (req, res) => {
+  try {
+    const acc = await kmi30Service.getKMI30Accuracy();
+    res.json({ success: true, data: acc });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Force scan now
+router.get('/kmi30/scan', async (req, res) => {
+  try {
+    const picks = await kmi30Service.createKMI30Predictions();
+    res.json({ success: true, data: picks, count: picks.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

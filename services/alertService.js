@@ -4,6 +4,8 @@ const newsService = require('./newsService');
 const shariahService = require('./shariahTradeService');
 const unifiedService = require('./unifiedSignalService');
 const logger = require('./alertLoggerService');
+const kmi30Service = require('./kmi30PredictService');
+
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
@@ -56,6 +58,21 @@ async function getAlertStocks() {
       meta.get(sym).shariahScore = r.score;
     }
   }
+
+  // 3. KMI-30 Intraday picks
+const kmi30 = await kmi30Service.scanKMI30().catch(() => []);
+if (kmi30.length > 0) {
+  for (const pick of kmi30) {
+    const sym = pick.symbol;
+    if (!symbols.has(sym)) {
+      symbols.add(sym);
+      meta.set(sym, { sources: [], aiAction: null, aiReason: null, shariahRec: null, shariahScore: null, kmi30: true });
+    }
+    meta.get(sym).sources.push('KMI30');
+    meta.get(sym).kmi30Score = pick.score;
+    meta.get(sym).kmi30Rationale = pick.rationale;
+  }
+}
 
   if (symbols.size === 0) return null;
 
@@ -183,6 +200,10 @@ function formatMessage(data) {
     // Source-specific notes (full AI reason, not truncated)
     if (a.aiReason) msg += `📰 AI News: ${a.aiReason}\n`;
     if (a.shariahScore) msg += `🕌 Shariah Score: ${a.shariahScore}/100\n`;
+     // KMI-30 specific
+    if (a.kmi30Score) {
+      msg += `🔥 KMI-30 Score: ${a.kmi30Score}/15 | ${a.kmi30Rationale}\n`;
+    }
   }
 
   msg += `\n────────────────────\n<i>Auto 15-min alert. Trade at your own risk.</i>`;
