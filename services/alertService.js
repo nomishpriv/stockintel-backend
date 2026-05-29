@@ -127,8 +127,14 @@ function formatMessage(data) {
     if (a.levels?.stopLoss) msg += `🛑 SL:     ₨${a.levels.stopLoss.toFixed(2)}\n`;
 
     // Why this signal
-    const short = a.description?.split('.')[0] || '';
-    msg += `<i>${short}</i>\n`;
+// OLD (cuts off mid-number)
+// const short = a.description?.split('.')[0] || '';
+
+// NEW (takes first 60 chars cleanly, no mid-word cutoff)
+const short = a.description?.length > 60 
+  ? a.description.slice(0, 60) + '...' 
+  : (a.description || '');
+      msg += `<i>${short}</i>\n`;
 
     // Source-specific notes
     if (a.aiReason) msg += `<i>📰 AI: ${a.aiReason}</i>\n`;
