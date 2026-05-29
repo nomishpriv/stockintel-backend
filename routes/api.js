@@ -484,10 +484,11 @@ router.get('/alerts/mobile', async (req, res) => {
     .hist-arrow { font-size: 12px; color: #64748b; transition: transform 0.2s; }
     .hist-item.open .hist-arrow { transform: rotate(180deg); }
     
-    .hist-body { max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out; }
-    .hist-item.open .hist-body { max-height: 800px; }
-    .hist-body-inner { padding: 0 12px 12px; border-top: 1px solid #334155; }
-    .hist-body pre { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.5; color: #cbd5e1; font-family: inherit; margin-top: 10px; }
+    /* FIX: Use very large max-height so even 10-stock alerts show fully */
+    .hist-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .hist-item.open .hist-body { max-height: 5000px; }
+    .hist-body-inner { padding: 0 12px 14px; border-top: 1px solid #334155; }
+    .hist-body-inner pre { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.55; color: #cbd5e1; font-family: inherit; margin-top: 10px; }
     
     .sound-btn { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: white; border: none; border-radius: 50px; padding: 12px 20px; font-size: 13px; font-weight: 700; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .sound-btn.off { background: #ef4444; }
