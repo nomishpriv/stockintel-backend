@@ -420,9 +420,6 @@ router.post('/unified-signals', async (req, res) => {
   }
 });
 
-const alertService = require('../services/alertService');
-const alertLogger  = require('../services/alertLoggerService');
-
 // Preview (no message sent)
 router.get('/alerts/preview', async (req, res) => {
   try {
