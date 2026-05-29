@@ -5,6 +5,8 @@ const path = require('path');
 const ALERT_LOG = path.join(__dirname, '..', '.alerts.json');
 const MAX_LOGS = 50;
 
+let writeQueue = Promise.resolve();
+
 async function loadLogs() {
   try {
     const raw = await fs.readFile(ALERT_LOG, 'utf8');
@@ -15,10 +17,17 @@ async function loadLogs() {
 }
 
 async function saveLog(entry) {
-  const logs = await loadLogs();
-  logs.unshift({ ...entry, id: Date.now() });
-  if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
-  await fs.writeFile(ALERT_LOG, JSON.stringify(logs, null, 2));
+  writeQueue = writeQueue.then(async () => {
+    try {
+      const logs = await loadLogs();
+      logs.unshift({ ...entry, id: Date.now() });
+      if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
+      await fs.writeFile(ALERT_LOG, JSON.stringify(logs, null, 2));
+    } catch (e) {
+      console.error('❌ Failed to save alert log:', e.message);
+    }
+  }).catch(() => {});
+  return writeQueue;
 }
 
 async function logAlert(message, data) {

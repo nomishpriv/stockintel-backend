@@ -9,6 +9,8 @@ const institutionalService = require('../services/institutionalActivityService')
 const orderFlowService = require('../services/orderFlowService');
 const resultService = require('../services/resultAnnouncementService');
 const { getUnifiedSignal, getUnifiedSignalsForStocks } = require('../services/unifiedSignalService');
+const alertService = require('../services/alertService');
+const alertLogger  = require('../services/alertLoggerService');
 
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -419,8 +421,9 @@ router.post('/unified-signals', async (req, res) => {
 });
 
 const alertService = require('../services/alertService');
+const alertLogger  = require('../services/alertLoggerService');
 
-// Preview what will be sent (no actual message)
+// Preview (no message sent)
 router.get('/alerts/preview', async (req, res) => {
   try {
     const data = await alertService.getAlertStocks();
@@ -431,31 +434,23 @@ router.get('/alerts/preview', async (req, res) => {
   }
 });
 
-// FORCE TEST — sends even when market is closed
+// Force test — sends NOW, bypasses market hours
 router.get('/alerts/test', async (req, res) => {
   try {
-    const data    = await alertService.getAlertStocks();
-    const message = alertService.formatMessage(data);
-    
-    // Send regardless of market hours
-    await alertService.sendTelegram(message);
-    await alertService.sendWhatsApp(message);
-    
-    res.json({ success: true, sent: true, message });
+    const result = await alertService.forceSendAlerts();
+    res.json({ success: true, ...result });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
 });
 
-const alertLogger = require('../services/alertLoggerService');
-
-// Mobile phone page — bookmark this on your home screen
+// Mobile page
 router.get('/alerts/mobile', async (req, res) => {
   try {
     const latest = await alertLogger.getLatest();
-    const logs = await alertLogger.getLogs(5);
-    
-    // Simple HTML that auto-refreshes every 15 seconds
+    const logs   = await alertLogger.getLogs(5);
+    const timePKT = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -483,28 +478,26 @@ router.get('/alerts/mobile', async (req, res) => {
 <body>
   <div class="header">
     <h1>🕌 PSX Live Alerts</h1>
-    <div class="time">Auto-refresh every 15s • ${new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })} PKT</div>
+    <div class="time">Auto-refresh every 15s • ${timePKT} PKT</div>
   </div>
-  
   <div class="alert-box ${latest && latest.count > 0 ? '' : 'no-alert'}">
     <div class="badge ${latest && latest.count > 0 ? '' : 'no'}">
-      ${latest && latest.count > 0 ? `🔥 ${latest.count} ACTIVE SETUP${latest.count > 1 ? 'S' : ''}` : '⏸ NO BUY SETUPS'}
+      ${latest && latest.count > 0 ? `🔥 ${latest.count} PICKS` : '⏸ NO PICKS'}
     </div>
     <pre>${latest ? latest.message : 'Waiting for first alert...'}</pre>
   </div>
-
   <div class="history">
     <h2>📜 Last 5 Cycles</h2>
     ${logs.map(l => `
       <div class="hist-item">
-        <div class="hist-time">${l.timePKT} • ${l.count} setup${l.count !== 1 ? 's' : ''}</div>
+        <div class="hist-time">${l.timePKT} • ${l.count} symbol${l.count !== 1 ? 's' : ''}</div>
         <div>${l.symbols.join(', ') || 'None'}</div>
       </div>
     `).join('')}
   </div>
 </body>
 </html>`;
-    
+
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch (e) {
@@ -512,16 +505,6 @@ router.get('/alerts/mobile', async (req, res) => {
   }
 });
 
-// JSON feed for latest (if you want to build a custom client)
-router.get('/alerts/latest', async (req, res) => {
-  try {
-    const latest = await alertLogger.getLatest();
-    const logs = await alertLogger.getLogs(20);
-    res.json({ success: true, latest, history: logs });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
 // ─── CACHE ────────────────────────────────────────────────────────────────────
 router.post('/cache/clear', async (req, res) => {
   si.clearCache();

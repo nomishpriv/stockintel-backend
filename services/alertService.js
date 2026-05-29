@@ -31,67 +31,110 @@ async function getAlertStocks() {
   const symbols = new Set();
   const meta = new Map();
 
+  // 1. AI News picks (ALL of them, not just BUY)
   if (news?.topTrades?.length > 0) {
     for (const t of news.topTrades) {
-      if (t.ticker && (t.action === 'BUY' || t.action === 'STRONG_BUY')) {
-        const sym = t.ticker.toUpperCase();
-        symbols.add(sym);
-        if (!meta.has(sym)) meta.set(sym, { sources: [] });
-        meta.get(sym).sources.push('AI News');
-      }
+      const sym = t.ticker?.toUpperCase();
+      if (!sym) continue;
+      symbols.add(sym);
+      if (!meta.has(sym)) meta.set(sym, { sources: [], aiAction: null, aiReason: null });
+      meta.get(sym).sources.push('AI News');
+      meta.get(sym).aiAction = t.action;
+      meta.get(sym).aiReason = t.reason;
     }
   }
 
+  // 2. Shariah picks (ALL of them, not just STRONG_LONG)
   if (shariah?.recommendations?.length > 0) {
     for (const r of shariah.recommendations) {
-      if (r.symbol && (r.recommendation === 'STRONG_LONG' || r.recommendation === 'LONG')) {
-        const sym = r.symbol.toUpperCase();
-        symbols.add(sym);
-        if (!meta.has(sym)) meta.set(sym, { sources: [] });
-        meta.get(sym).sources.push('Shariah');
-      }
+      const sym = r.symbol?.toUpperCase();
+      if (!sym) continue;
+      symbols.add(sym);
+      if (!meta.has(sym)) meta.set(sym, { sources: [], aiAction: null, aiReason: null });
+      meta.get(sym).sources.push('Shariah');
+      meta.get(sym).shariahRec = r.recommendation;
+      meta.get(sym).shariahScore = r.score;
     }
   }
 
   if (symbols.size === 0) return null;
 
+  // 3. Get unified analysis for EVERY symbol (no filtering)
   const unified = await unifiedService.getUnifiedSignalsForStocks(Array.from(symbols));
-  const actionable = unified
-    .map(u => ({ ...u, sources: [...new Set(meta.get(u.symbol)?.sources || [])] }))
-    .filter(u => u.signal === 'BUY' || u.signal === 'STRONG_BUY');
+
+  // 4. Merge source tags + keep ALL (even WAIT/NEUTRAL)
+  const allPicks = unified.map(u => {
+    const m = meta.get(u.symbol) || { sources: [] };
+    const isBoth = m.sources.length > 1;
+    return {
+      ...u,
+      sources: [...new Set(m.sources)],
+      aiAction: m.aiAction,
+      aiReason: m.aiReason,
+      shariahRec: m.shariahRec,
+      shariahScore: m.shariahScore,
+      isBoth
+    };
+  });
+
+  // Sort: BUY first, then WAIT, then others
+  const sortOrder = { STRONG_BUY: 0, BUY: 1, WAIT: 2, NEUTRAL: 3, SELL: 4, STRONG_SELL: 5 };
+  allPicks.sort((a, b) => (sortOrder[a.signal] || 99) - (sortOrder[b.signal] || 99));
 
   return {
     marketContext: {
       newsSentiment: news?.sentiment || 'NEUTRAL',
       newsSignal:    news?.signal || 'HOLD',
       newsSummary:   news?.summary || '',
-      shariahCount:  shariah?.recommendations?.length || 0
+      shariahCount:  shariah?.recommendations?.length || 0,
+      totalPicks:    allPicks.length
     },
-    alerts: actionable,
+    alerts: allPicks,
     timestamp: new Date().toISOString()
   };
 }
 
 function formatMessage(data) {
   const timePKT = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
+
   if (!data || data.alerts.length === 0) {
-    return `🕌 PSX Alert | ${timePKT} PKT\n\nNo actionable BUY setups from AI News + Shariah right now.\n📰 Context: ${data?.marketContext?.newsSummary || 'N/A'}`;
+    return `🕌 PSX Alert | ${timePKT} PKT\n\nNo picks from AI News or Shariah right now.`;
   }
+
   let msg = `🕌 <b>PSX Auto Alert</b>\n⏰ <code>${timePKT} PKT</code>\n`;
   msg += `📰 News: ${data.marketContext.newsSentiment} (${data.marketContext.newsSignal})\n`;
+  msg += `🕌 Shariah picks: ${data.marketContext.shariahCount}\n`;
+  msg += `📊 Total scanned: ${data.marketContext.totalPicks}\n`;
   msg += `────────────────────\n`;
+
   for (const a of data.alerts) {
     const srcTags = a.sources.map(s => s === 'AI News' ? '📰' : '🕌').join('');
-    const both = a.sources.length > 1 ? ' ⚡BOTH' : '';
-    msg += `\n${a.signalMeta?.emoji || '🟢'} <b>${srcTags} ${a.symbol}${both}</b>\n`;
-    msg += `💰 Price: ₨${a.price?.toFixed(2)}\n`;
+    const both    = a.isBoth ? ' ⚡BOTH' : '';
+
+    // Signal badge
+    const sigEmoji = a.signalMeta?.emoji || '⚪';
+    const sigLabel = a.signalMeta?.action || a.signal;
+
+    msg += `\n${sigEmoji} <b>${srcTags} ${a.symbol}${both}</b> — ${sigLabel}\n`;
+    msg += `💰 Price: ₨${a.price?.toFixed(2)} | ${a.changePercent > 0 ? '+' : ''}${a.changePercent?.toFixed(2)}%\n`;
+    msg += `📊 Vol: ${(a.volume / 1000).toFixed(0)}K${a.volAvg10d > 0 ? ` (vs ${(a.volume / a.volAvg10d).toFixed(1)}x avg)` : ''}\n`;
+    if (a.rsi) msg += `📈 RSI: ${a.rsi.toFixed(0)} | `;
+    msg += `Conf: ${a.confidence}% | Risk: ${a.risk}\n`;
+
+    // Entry / Target / SL — ALWAYS show if available
     if (a.levels?.entry)    msg += `🎯 Entry:  ₨${a.levels.entry.toFixed(2)}\n`;
     if (a.levels?.target)   msg += `📈 Target: ₨${a.levels.target.toFixed(2)}\n`;
     if (a.levels?.stopLoss) msg += `🛑 SL:     ₨${a.levels.stopLoss.toFixed(2)}\n`;
-    msg += `⚠️ Risk: ${a.risk} | Conf: ${a.confidence}%\n`;
+
+    // Why this signal
     const short = a.description?.split('.')[0] || '';
     msg += `<i>${short}</i>\n`;
+
+    // Source-specific notes
+    if (a.aiReason) msg += `<i>📰 AI: ${a.aiReason}</i>\n`;
+    if (a.shariahScore) msg += `<i>🕌 Shariah score: ${a.shariahScore}/${a.maxScore || 100}</i>\n`;
   }
+
   msg += `\n────────────────────\n<i>Auto 15-min alert. Trade at your own risk.</i>`;
   return msg;
 }
@@ -124,19 +167,33 @@ async function sendWhatsApp(text) {
 }
 
 async function sendAlerts() {
-  const data = await getAlertStocks();
+  if (!isMarketOpen()) {
+    console.log('⏸ Market closed — skipping alert cycle');
+    return;
+  }
+
+  const data    = await getAlertStocks();
   const message = formatMessage(data);
 
-  // Try Telegram/WhatsApp first
   const tgOk = await sendTelegram(message);
   const waOk = await sendWhatsApp(message);
-
-  // ALWAYS save to local file (works even when internet is down)
   await logger.logAlert(message, data);
 
   if (!tgOk && !waOk) {
-    console.log('💾 Alert saved to local file (.alerts.json) — Telegram/WhatsApp unreachable');
+    console.log('💾 Alert saved to local file (.alerts.json)');
   }
 }
 
-module.exports = { getAlertStocks, formatMessage, sendAlerts, sendTelegram, sendWhatsApp };
+// Force-send regardless of market hours (for testing)
+async function forceSendAlerts() {
+  const data    = await getAlertStocks();
+  const message = formatMessage(data);
+
+  const tgOk = await sendTelegram(message);
+  const waOk = await sendWhatsApp(message);
+  await logger.logAlert(message, data);
+
+  return { telegram: tgOk, whatsapp: waOk, logged: true, data };
+}
+
+module.exports = { getAlertStocks, formatMessage, sendAlerts, forceSendAlerts, sendTelegram, sendWhatsApp };
