@@ -267,6 +267,7 @@ async function getUnifiedSignal(symbol) {
     price: stock.price,
     changePercent: stock.changePercent,
     volume: stock.volume,
+    volAvg10d: stock.volAvg10d || 0,
     rsi: stock.rsi,
 
     signal: signal.key,

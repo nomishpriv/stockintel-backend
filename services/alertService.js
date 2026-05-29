@@ -110,35 +110,79 @@ function formatMessage(data) {
   for (const a of data.alerts) {
     const srcTags = a.sources.map(s => s === 'AI News' ? '📰' : '🕌').join('');
     const both    = a.isBoth ? ' ⚡BOTH' : '';
-
-    // Signal badge
     const sigEmoji = a.signalMeta?.emoji || '⚪';
     const sigLabel = a.signalMeta?.action || a.signal;
 
     msg += `\n${sigEmoji} <b>${srcTags} ${a.symbol}${both}</b> — ${sigLabel}\n`;
     msg += `💰 Price: ₨${a.price?.toFixed(2)} | ${a.changePercent > 0 ? '+' : ''}${a.changePercent?.toFixed(2)}%\n`;
-    msg += `📊 Vol: ${(a.volume / 1000).toFixed(0)}K${a.volAvg10d > 0 ? ` (vs ${(a.volume / a.volAvg10d).toFixed(1)}x avg)` : ''}\n`;
+
+    // Volume with average comparison
+    const volK = (a.volume / 1000).toFixed(0);
+    if (a.volAvg10d > 0) {
+      const volRatio = (a.volume / a.volAvg10d).toFixed(1);
+      const volTrend = a.volume > a.volAvg10d * 1.5 ? '🔥 Surging' :
+                       a.volume > a.volAvg10d * 1.2 ? '⬆️ Above avg' :
+                       a.volume > a.volAvg10d * 0.8 ? '➡️ Normal' : '⬇️ Below avg';
+      msg += `📊 Vol: ${volK}K (${volRatio}x vs 10d avg) ${volTrend}\n`;
+    } else {
+      msg += `📊 Vol: ${volK}K\n`;
+    }
+
     if (a.rsi) msg += `📈 RSI: ${a.rsi.toFixed(0)} | `;
     msg += `Conf: ${a.confidence}% | Risk: ${a.risk}\n`;
 
-    // Entry / Target / SL — ALWAYS show if available
+    // Entry / Target / SL
     if (a.levels?.entry)    msg += `🎯 Entry:  ₨${a.levels.entry.toFixed(2)}\n`;
     if (a.levels?.target)   msg += `📈 Target: ₨${a.levels.target.toFixed(2)}\n`;
     if (a.levels?.stopLoss) msg += `🛑 SL:     ₨${a.levels.stopLoss.toFixed(2)}\n`;
 
-    // Why this signal
-// OLD (cuts off mid-number)
-// const short = a.description?.split('.')[0] || '';
+    // FULL unified description — no truncation
+    if (a.description) {
+      msg += `🧠 <i>${a.description}</i>\n`;
+    }
 
-// NEW (takes first 60 chars cleanly, no mid-word cutoff)
-const short = a.description?.length > 60 
-  ? a.description.slice(0, 60) + '...' 
-  : (a.description || '');
-      msg += `<i>${short}</i>\n`;
+    // SMC Details (full, not truncated)
+    const smc = a.details?.smc;
+    if (smc) {
+      const parts = [];
+      if (smc.fvg?.length > 0) {
+        const f = smc.fvg[0];
+        parts.push(`${f.type.includes('BULLISH') ? '🟢' : '🔴'} FVG ${f.zone?.bottom?.toFixed(1)}-${f.zone?.top?.toFixed(1)} (${f.gapPct}%)`);
+      }
+      if (smc.orderBlocks?.length > 0) {
+        const ob = smc.orderBlocks[0];
+        parts.push(`${ob.type.includes('BULLISH') ? '🟢' : '🔴'} OB ${ob.zone?.bottom?.toFixed(1)}-${ob.zone?.top?.toFixed(1)}`);
+      }
+      if (smc.liquiditySweeps?.length > 0) {
+        const sw = smc.liquiditySweeps[0];
+        parts.push(`${sw.type.includes('BULLISH') ? '🟢' : '🔴'} Sweep @ ${sw.level?.toFixed(1)}`);
+      }
+      if (smc.bos?.length > 0) {
+        const b = smc.bos[smc.bos.length - 1];
+        parts.push(`${b.type === 'BULLISH' ? '🟢' : '🔴'} BOS`);
+      }
+      if (smc.choch?.length > 0) {
+        const c = smc.choch[smc.choch.length - 1];
+        parts.push(`${c.type.includes('BULLISH') ? '🟢' : '🔴'} CHOCH`);
+      }
+      if (parts.length > 0) {
+        msg += `📐 SMC: ${parts.join(' | ')}\n`;
+      }
+    }
 
-    // Source-specific notes
-    if (a.aiReason) msg += `<i>📰 AI: ${a.aiReason}</i>\n`;
-    if (a.shariahScore) msg += `<i>🕌 Shariah score: ${a.shariahScore}/${a.maxScore || 100}</i>\n`;
+    // Order Flow (full)
+    const flow = a.details?.orderFlow;
+    if (flow?.ready) {
+      const flowEmoji = flow.trend === 'BUYING_INCREASING' ? '🟢' :
+                        flow.trend === 'SELLING_INCREASING' ? '🔴' :
+                        flow.trend === 'BUYERS_DOMINANT' ? '🟢' :
+                        flow.trend === 'SELLERS_DOMINANT' ? '🔴' : '⚪';
+      msg += `⚖️ Flow: ${flowEmoji} ${flow.trend} (ratio ${flow.overallRatio}) | ${flow.snapshots} snaps\n`;
+    }
+
+    // Source-specific notes (full AI reason, not truncated)
+    if (a.aiReason) msg += `📰 AI News: ${a.aiReason}\n`;
+    if (a.shariahScore) msg += `🕌 Shariah Score: ${a.shariahScore}/100\n`;
   }
 
   msg += `\n────────────────────\n<i>Auto 15-min alert. Trade at your own risk.</i>`;
