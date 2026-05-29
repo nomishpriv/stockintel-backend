@@ -445,7 +445,7 @@ router.get('/alerts/test', async (req, res) => {
 router.get('/alerts/mobile', async (req, res) => {
   try {
     const latest = await alertLogger.getLatest();
-    const logs   = await alertLogger.getLogs(5);
+    const logs   = await alertLogger.getLogs(20);
     const timePKT = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
 
     const html = `<!DOCTYPE html>
@@ -457,19 +457,40 @@ router.get('/alerts/mobile', async (req, res) => {
   <meta http-equiv="refresh" content="15">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; padding-bottom: 80px; }
     .header { text-align: center; margin-bottom: 16px; }
     .header h1 { font-size: 18px; color: #fbbf24; }
     .time { font-size: 12px; color: #64748b; margin-top: 4px; }
-    .alert-box { background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 12px; border-left: 4px solid #22c55e; }
+    
+    .alert-box { background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 14px; border-left: 4px solid #22c55e; }
     .alert-box.no-alert { border-left-color: #f59e0b; }
     .alert-box pre { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.5; color: #e2e8f0; font-family: inherit; }
-    .history { margin-top: 20px; }
-    .history h2 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; }
-    .hist-item { background: #1e293b; border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 12px; color: #cbd5e1; }
-    .hist-time { color: #64748b; font-size: 11px; margin-bottom: 4px; }
-    .badge { display: inline-block; background: #22c55e20; color: #22c55e; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+    .badge.ok { background: #22c55e20; color: #22c55e; }
     .badge.no { background: #f59e0b20; color: #f59e0b; }
+    
+    .history { margin-top: 10px; }
+    .history h2 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    
+    .hist-item { background: #1e293b; border-radius: 10px; margin-bottom: 8px; overflow: hidden; cursor: pointer; transition: background 0.15s; }
+    .hist-item:active { background: #334155; }
+    .hist-header { padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .hist-left { display: flex; flex-direction: column; gap: 2px; }
+    .hist-time { color: #94a3b8; font-size: 11px; }
+    .hist-symbols { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+    .hist-count { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px; }
+    .hist-count.ok { background: #22c55e20; color: #22c55e; }
+    .hist-count.none { background: #47556920; color: #94a3b8; }
+    .hist-arrow { font-size: 12px; color: #64748b; transition: transform 0.2s; }
+    .hist-item.open .hist-arrow { transform: rotate(180deg); }
+    
+    .hist-body { max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out; }
+    .hist-item.open .hist-body { max-height: 800px; }
+    .hist-body-inner { padding: 0 12px 12px; border-top: 1px solid #334155; }
+    .hist-body pre { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.5; color: #cbd5e1; font-family: inherit; margin-top: 10px; }
+    
+    .sound-btn { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: white; border: none; border-radius: 50px; padding: 12px 20px; font-size: 13px; font-weight: 700; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .sound-btn.off { background: #ef4444; }
   </style>
 </head>
 <body>
@@ -477,21 +498,88 @@ router.get('/alerts/mobile', async (req, res) => {
     <h1>🕌 PSX Live Alerts</h1>
     <div class="time">Auto-refresh every 15s • ${timePKT} PKT</div>
   </div>
+  
   <div class="alert-box ${latest && latest.count > 0 ? '' : 'no-alert'}">
-    <div class="badge ${latest && latest.count > 0 ? '' : 'no'}">
+    <div class="badge ${latest && latest.count > 0 ? 'ok' : 'no'}">
       ${latest && latest.count > 0 ? `🔥 ${latest.count} PICKS` : '⏸ NO PICKS'}
     </div>
     <pre>${latest ? latest.message : 'Waiting for first alert...'}</pre>
   </div>
+
   <div class="history">
-    <h2>📜 Last 5 Cycles</h2>
-    ${logs.map(l => `
-      <div class="hist-item">
-        <div class="hist-time">${l.timePKT} • ${l.count} symbol${l.count !== 1 ? 's' : ''}</div>
-        <div>${l.symbols.join(', ') || 'None'}</div>
+    <h2>📜 Recent Cycles <span style="font-weight:400;color:#64748b;font-size:12px">(tap to expand)</span></h2>
+    ${logs.map((l, i) => `
+      <div class="hist-item" onclick="this.classList.toggle('open')">
+        <div class="hist-header">
+          <div class="hist-left">
+            <div class="hist-time">${l.timePKT}</div>
+            <div class="hist-symbols">${l.symbols.join(', ') || 'No setups'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="hist-count ${l.count > 0 ? 'ok' : 'none'}">${l.count} setup${l.count !== 1 ? 's' : ''}</div>
+            <div class="hist-arrow">▼</div>
+          </div>
+        </div>
+        <div class="hist-body">
+          <div class="hist-body-inner">
+            <pre>${l.message}</pre>
+          </div>
+        </div>
       </div>
     `).join('')}
   </div>
+
+  <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔔 Sound ON</button>
+
+  <script>
+    let soundEnabled = true;
+    let lastId = ${latest?.id || 0};
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundBtn');
+      btn.textContent = soundEnabled ? '🔔 Sound ON' : '🔕 Sound OFF';
+      btn.classList.toggle('off', !soundEnabled);
+    }
+
+    function playBeep() {
+      if (!soundEnabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.3;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+        setTimeout(() => {
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.frequency.value = 1000;
+          gain2.gain.value = 0.3;
+          osc2.start();
+          osc2.stop(ctx.currentTime + 0.15);
+        }, 200);
+      } catch(e) {}
+    }
+
+    setInterval(() => {
+      fetch('/api/alerts/latest')
+        .then(r => r.json())
+        .then(data => {
+          const newId = data?.latest?.id;
+          if (newId && newId !== lastId) {
+            lastId = newId;
+            if (data.latest.count > 0) playBeep();
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+  </script>
 </body>
 </html>`;
 
