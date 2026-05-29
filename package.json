@@ -12,6 +12,7 @@
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
-    "groq-sdk": "^1.2.0"
+    "groq-sdk": "^1.2.0",
+    "node-cron": "^4.2.1"
   }
 }

@@ -418,6 +418,110 @@ router.post('/unified-signals', async (req, res) => {
   }
 });
 
+const alertService = require('../services/alertService');
+
+// Preview what will be sent (no actual message)
+router.get('/alerts/preview', async (req, res) => {
+  try {
+    const data = await alertService.getAlertStocks();
+    const msg  = alertService.formatMessage(data);
+    res.json({ success: true, data, message: msg });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// FORCE TEST — sends even when market is closed
+router.get('/alerts/test', async (req, res) => {
+  try {
+    const data    = await alertService.getAlertStocks();
+    const message = alertService.formatMessage(data);
+    
+    // Send regardless of market hours
+    await alertService.sendTelegram(message);
+    await alertService.sendWhatsApp(message);
+    
+    res.json({ success: true, sent: true, message });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+const alertLogger = require('../services/alertLoggerService');
+
+// Mobile phone page — bookmark this on your home screen
+router.get('/alerts/mobile', async (req, res) => {
+  try {
+    const latest = await alertLogger.getLatest();
+    const logs = await alertLogger.getLogs(5);
+    
+    // Simple HTML that auto-refreshes every 15 seconds
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PSX Alerts</title>
+  <meta http-equiv="refresh" content="15">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; }
+    .header { text-align: center; margin-bottom: 16px; }
+    .header h1 { font-size: 18px; color: #fbbf24; }
+    .time { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .alert-box { background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 12px; border-left: 4px solid #22c55e; }
+    .alert-box.no-alert { border-left-color: #f59e0b; }
+    .alert-box pre { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.5; color: #e2e8f0; font-family: inherit; }
+    .history { margin-top: 20px; }
+    .history h2 { font-size: 14px; color: #94a3b8; margin-bottom: 10px; }
+    .hist-item { background: #1e293b; border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 12px; color: #cbd5e1; }
+    .hist-time { color: #64748b; font-size: 11px; margin-bottom: 4px; }
+    .badge { display: inline-block; background: #22c55e20; color: #22c55e; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+    .badge.no { background: #f59e0b20; color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🕌 PSX Live Alerts</h1>
+    <div class="time">Auto-refresh every 15s • ${new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })} PKT</div>
+  </div>
+  
+  <div class="alert-box ${latest && latest.count > 0 ? '' : 'no-alert'}">
+    <div class="badge ${latest && latest.count > 0 ? '' : 'no'}">
+      ${latest && latest.count > 0 ? `🔥 ${latest.count} ACTIVE SETUP${latest.count > 1 ? 'S' : ''}` : '⏸ NO BUY SETUPS'}
+    </div>
+    <pre>${latest ? latest.message : 'Waiting for first alert...'}</pre>
+  </div>
+
+  <div class="history">
+    <h2>📜 Last 5 Cycles</h2>
+    ${logs.map(l => `
+      <div class="hist-item">
+        <div class="hist-time">${l.timePKT} • ${l.count} setup${l.count !== 1 ? 's' : ''}</div>
+        <div>${l.symbols.join(', ') || 'None'}</div>
+      </div>
+    `).join('')}
+  </div>
+</body>
+</html>`;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (e) {
+    res.status(500).send('Error loading alerts');
+  }
+});
+
+// JSON feed for latest (if you want to build a custom client)
+router.get('/alerts/latest', async (req, res) => {
+  try {
+    const latest = await alertLogger.getLatest();
+    const logs = await alertLogger.getLogs(20);
+    res.json({ success: true, latest, history: logs });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 // ─── CACHE ────────────────────────────────────────────────────────────────────
 router.post('/cache/clear', async (req, res) => {
   si.clearCache();
