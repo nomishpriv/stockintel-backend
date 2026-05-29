@@ -454,13 +454,26 @@ router.get('/alerts/mobile', async (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PSX Alerts</title>
-  <meta http-equiv="refresh" content="15">
+  <meta http-equiv="refresh" content="30">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; padding-bottom: 80px; }
-    .header { text-align: center; margin-bottom: 16px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; padding-bottom: 100px; }
+    
+    .header { text-align: center; margin-bottom: 12px; position: relative; }
     .header h1 { font-size: 18px; color: #fbbf24; }
     .time { font-size: 12px; color: #64748b; margin-top: 4px; }
+    
+    .top-bar { display: flex; gap: 10px; margin-bottom: 14px; }
+    .btn { flex: 1; border: none; border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-refresh { background: #3b82f6; color: white; }
+    .btn-refresh:active { background: #2563eb; }
+    .btn-sound { background: #22c55e; color: white; }
+    .btn-sound.off { background: #ef4444; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    .status { text-align: center; font-size: 12px; color: #94a3b8; margin-bottom: 10px; min-height: 18px; }
+    .status.ok { color: #22c55e; }
+    .status.err { color: #ef4444; }
     
     .alert-box { background: #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 14px; border-left: 4px solid #22c55e; }
     .alert-box.no-alert { border-left-color: #f59e0b; }
@@ -484,30 +497,37 @@ router.get('/alerts/mobile', async (req, res) => {
     .hist-arrow { font-size: 12px; color: #64748b; transition: transform 0.2s; }
     .hist-item.open .hist-arrow { transform: rotate(180deg); }
     
-    /* FIX: Use very large max-height so even 10-stock alerts show fully */
     .hist-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
-    .hist-item.open .hist-body { max-height: 5000px; }
+    .hist-item.open .hist-body { max-height: 8000px; }
     .hist-body-inner { padding: 0 12px 14px; border-top: 1px solid #334155; }
     .hist-body-inner pre { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; line-height: 1.55; color: #cbd5e1; font-family: inherit; margin-top: 10px; }
-    
-    .sound-btn { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: white; border: none; border-radius: 50px; padding: 12px 20px; font-size: 13px; font-weight: 700; cursor: pointer; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .sound-btn.off { background: #ef4444; }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>🕌 PSX Live Alerts</h1>
-    <div class="time">Auto-refresh every 15s • ${timePKT} PKT</div>
-  </div>
-  
-  <div class="alert-box ${latest && latest.count > 0 ? '' : 'no-alert'}">
-    <div class="badge ${latest && latest.count > 0 ? 'ok' : 'no'}">
-      ${latest && latest.count > 0 ? `🔥 ${latest.count} PICKS` : '⏸ NO PICKS'}
-    </div>
-    <pre>${latest ? latest.message : 'Waiting for first alert...'}</pre>
+    <div class="time">Auto-refresh every 30s • ${timePKT} PKT</div>
   </div>
 
-  <div class="history">
+  <div class="top-bar">
+    <button class="btn btn-refresh" id="refreshBtn" onclick="manualRefresh()">
+      🔄 Refresh
+    </button>
+    <button class="btn btn-sound" id="soundBtn" onclick="toggleSound()">
+      🔔 Sound ON
+    </button>
+  </div>
+
+  <div class="status" id="status"></div>
+  
+  <div class="alert-box ${latest && latest.count > 0 ? '' : 'no-alert'}" id="alertBox">
+    <div class="badge ${latest && latest.count > 0 ? 'ok' : 'no'}" id="badge">
+      ${latest && latest.count > 0 ? `🔥 ${latest.count} PICKS` : '⏸ NO PICKS'}
+    </div>
+    <pre id="alertText">${latest ? latest.message : 'Waiting for first alert...'}</pre>
+  </div>
+
+  <div class="history" id="history">
     <h2>📜 Recent Cycles <span style="font-weight:400;color:#64748b;font-size:12px">(tap to expand)</span></h2>
     ${logs.map((l, i) => `
       <div class="hist-item" onclick="this.classList.toggle('open')">
@@ -529,8 +549,6 @@ router.get('/alerts/mobile', async (req, res) => {
       </div>
     `).join('')}
   </div>
-
-  <button class="sound-btn" id="soundBtn" onclick="toggleSound()">🔔 Sound ON</button>
 
   <script>
     let soundEnabled = true;
@@ -568,6 +586,36 @@ router.get('/alerts/mobile', async (req, res) => {
       } catch(e) {}
     }
 
+    async function manualRefresh() {
+      const btn = document.getElementById('refreshBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.textContent = '⏳ Generating alert...';
+      status.className = 'status';
+
+      try {
+        const res = await fetch('/api/alerts/test');
+        const json = await res.json();
+
+        if (json.success) {
+          status.textContent = '✅ Alert sent! Reloading...';
+          status.className = 'status ok';
+          if (json.data?.alerts?.length > 0) playBeep();
+          // Reload page after 1s to show fresh data
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          status.textContent = '❌ Failed: ' + (json.error || 'Unknown');
+          status.className = 'status err';
+          btn.disabled = false;
+        }
+      } catch (e) {
+        status.textContent = '❌ Network error';
+        status.className = 'status err';
+        btn.disabled = false;
+      }
+    }
+
+    // Background check for new alerts (no full page reload)
     setInterval(() => {
       fetch('/api/alerts/latest')
         .then(r => r.json())
@@ -576,6 +624,13 @@ router.get('/alerts/mobile', async (req, res) => {
           if (newId && newId !== lastId) {
             lastId = newId;
             if (data.latest.count > 0) playBeep();
+            // Update badge and text without reload
+            document.getElementById('badge').textContent = data.latest.count > 0 
+              ? '🔥 ' + data.latest.count + ' PICKS' 
+              : '⏸ NO PICKS';
+            document.getElementById('badge').className = 'badge ' + (data.latest.count > 0 ? 'ok' : 'no');
+            document.getElementById('alertText').textContent = data.latest.message;
+            document.getElementById('alertBox').className = 'alert-box ' + (data.latest.count > 0 ? '' : 'no-alert');
           }
         })
         .catch(() => {});
