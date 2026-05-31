@@ -4,6 +4,7 @@
 const axios = require('axios');
 const Groq  = require('groq-sdk');
 
+const ahlService = require('./ahlResearchService');
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -353,13 +354,15 @@ async function getNewsImpact({ forceRefresh = false } = {}) {
 
   try {
     // Fetch everything in parallel
-    const [rssResults, mettisResults] = await Promise.all([
+    const [rssResults, mettisResults, ahlResults] = await Promise.all([
       Promise.all(NEWS_SOURCES.map(fetchRSS)),
       Promise.all(METTIS_APIS.map(fetchMettisAPI)),
+      ahlService.fetchAHLResearch().catch(() => []),
     ]);
 
     // Merge — Mettis first (higher weight/priority)
     const allItems = [
+      ...ahlResults,
       ...mettisResults.flat(),
       ...rssResults.flat(),
     ];
