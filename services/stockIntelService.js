@@ -275,6 +275,19 @@ async function getVolumeSpeed() {
   }
 }
 
+async function fetchTickTrades(symbol, limit = 50) {
+  if (!symbol) return [];
+  try {
+    const { data } = await api.get(`/trading/trades`, {
+      params: { symbol: symbol.toUpperCase(), limit },
+      timeout: 8000
+    });
+    return Array.isArray(data) ? data : (data?.data || []);
+  } catch (e) {
+    return [];
+  }
+}
+
 // ========== FETCH ALL STOCKS ==========
 let fetchPromise = null;
 
@@ -303,12 +316,12 @@ async function fetchAllStocks() {
       }
 
       const stocks = Object.entries(raw)
-        .filter(([sym, s]) => {
-          if (/R$|PREF|ETF|FUT|-/.test(sym)) return false;
-          if (s.st !== 1 || !s.c || +s.c <= 0) return false;
-          return true;
-        })
-        .map(([sym, s]) => ({
+          .filter(([sym, s]) => {
+            // Only skip if no price. Keep st=0, st=2, ETFs, rights, etc.
+            if (!s.c || +s.c <= 0) return false;
+            return true;
+          })
+          .map(([sym, s]) => ({
           symbol: sym, name: s.nm, price: +s.c, open: +s.o, high: +s.h, low: +s.l,
           volume: +s.v, change: +s.ch, changePercent: +((s.pch || 0) * 100).toFixed(2),
           prevClose: +s.ldcp, prevVolume: +s.ldcv,
@@ -357,6 +370,18 @@ async function fetchAllStocks() {
             return score >= 2 ? 'STRONG_BUY' : score === 1 ? 'BUY' : score === -1 ? 'SELL' : score <= -2 ? 'STRONG_SELL' : 'NEUTRAL';
           })(),
         }));
+
+        // Fetch tick data for top movers
+const topMovers = stocks.filter(s => s.volume > 100000).slice(0, 20);
+for (const stock of topMovers) {
+  try {
+    const ticks = await fetchTickTrades(stock.symbol, 30);
+    if (ticks.length > 5) {
+      const flow = await orderFlowService.analyzeTickTrades(stock.symbol, ticks);
+      stock.tickFlow = flow; // attach to stock object
+    }
+  } catch {}
+}
 
       console.log(`✅ ${stocks.length} stocks`);
       setCache('all', stocks);
@@ -422,6 +447,35 @@ async function getOpportunities(n = 10) {
   const all = await fetchAllStocks();
   return all.filter(s => s.price > 0 && s.volume > 10000).sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).slice(0, n);
 }
+
+async function diagnoseFilter() {
+  const data = await fetchMarketData();
+  const raw = data?.data?.eq;
+  if (!raw) return;
+
+  const all = Object.entries(raw);
+  let dropped = 0;
+  const reasons = {};
+
+  for (const [sym, s] of all) {
+    let reason = null;
+    // NEW LOGIC: match your updated fetchAllStocks filter
+    if (!s.c || +s.c <= 0) reason = `no_price(c=${s.c})`;
+    
+    if (reason) {
+      dropped++;
+      reasons[reason] = (reasons[reason] || 0) + 1;
+    }
+  }
+
+  console.log('📊 Filter diagnosis (NEW):');
+  console.log(`   Total from API: ${all.length}`);
+  console.log(`   Kept:           ${all.length - dropped}`);
+  console.log(`   Dropped:        ${dropped}`);
+  console.log('   Reasons:', reasons);
+}
+
+// diagnoseFilter();
 
 // FIX: Also wipe volume caches so stale data doesn't linger.
 function clearCache() {

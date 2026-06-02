@@ -197,6 +197,11 @@ function formatMessage(data) {
       msg += `⚖️ Flow: ${flowEmoji} ${flow.trend} (ratio ${flow.overallRatio}) | ${flow.snapshots} snaps\n`;
     }
 
+        // Tick flow
+    if (a.tickFlow) {
+      msg += `⚡ Tick: ${a.tickFlow.signal} (${a.tickFlow.buyPct}% buy, ${a.tickFlow.totalTrades} trades)\n`;
+    }
+
     // Source-specific notes (full AI reason, not truncated)
     if (a.aiReason) msg += `📰 AI News: ${a.aiReason}\n`;
     if (a.shariahScore) msg += `🕌 Shariah Score: ${a.shariahScore}/100\n`;

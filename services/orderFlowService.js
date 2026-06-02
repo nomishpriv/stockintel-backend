@@ -219,4 +219,106 @@ async function recordFromStocks(stocks) {
   await saveOrderFlow(all);
 }
 
-module.exports = { recordFromStocks, analyzeRatio, recordSnapshot };
+// ═══════════════════════════════════════════════════════════════════════════
+// NEW: TICK TRADE ANALYSIS (time-and-sales data from /trading/trades)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Analyzes raw tick data from StockIntel /trading/trades endpoint.
+ * Determines buyer-initiated vs seller-initiated volume.
+ * 
+ * Tick format: { m, s, t, tx, x, v, tsq, tsqb, tsqs, xi, xt }
+ * x = price, v = volume, tsqb = bid queue, tsqs = ask queue
+ */
+function analyzeTickTrades(symbol, trades) {
+  if (!Array.isArray(trades) || trades.length === 0) {
+    return { symbol, ready: false, message: 'No tick data' };
+  }
+
+  let buyVolume = 0;      // Green trades (hitting ask)
+  let sellVolume = 0;     // Red trades (hitting bid)
+  let totalVolume = 0;
+  let lastPrice = trades[0].x || 0;
+  let lastBidQueue = trades[0].tsqb || 0;
+  let lastAskQueue = trades[0].tsqs || 0;
+
+  for (let i = 0; i < trades.length; i++) {
+    const trade = trades[i];
+    const price = trade.x || 0;
+    const vol = trade.v || 0;
+    const bidQueue = trade.tsqb || 0;
+    const askQueue = trade.tsqs || 0;
+
+    totalVolume += vol;
+
+    // Method 1: Price momentum (trade at or above last price = buyer aggressive)
+    // Method 2: Queue depletion (bid queue drops = seller hit bid, ask queue drops = buyer lifted ask)
+    let isBuy = false;
+
+    if (i === 0) {
+      // First trade: compare to next or use queue logic
+      isBuy = (bidQueue < lastBidQueue) || (askQueue === 0 && bidQueue > 0);
+    } else {
+      // Price went up or held = buyer initiated
+      if (price >= lastPrice) {
+        isBuy = true;
+      } else {
+        isBuy = false;
+      }
+    }
+
+    // Refine with queue data when available
+    if (bidQueue === 0 && askQueue > 0) {
+      // All bids got hit = strong selling
+      isBuy = false;
+    } else if (askQueue === 0 && bidQueue > 0) {
+      // All asks got lifted = strong buying
+      isBuy = true;
+    }
+
+    if (isBuy) {
+      buyVolume += vol;
+    } else {
+      sellVolume += vol;
+    }
+
+    lastPrice = price;
+    lastBidQueue = bidQueue;
+    lastAskQueue = askQueue;
+  }
+
+  const ratio = sellVolume > 0 ? +(buyVolume / sellVolume).toFixed(2) : (buyVolume > 0 ? 99 : 1);
+  const buyPct = totalVolume > 0 ? +((buyVolume / totalVolume) * 100).toFixed(1) : 0;
+  const sellPct = totalVolume > 0 ? +((sellVolume / totalVolume) * 100).toFixed(1) : 0;
+
+  let trend, color, signal;
+  if (ratio > 2.0 && buyPct > 65) {
+    trend = 'STRONG_BUYING'; color = '#22c55e'; signal = '🟢🟢 Strong buying';
+  } else if (ratio > 1.3 && buyPct > 55) {
+    trend = 'BUYING'; color = '#84cc16'; signal = '🟢 Buying';
+  } else if (ratio < 0.5 && sellPct > 65) {
+    trend = 'STRONG_SELLING'; color = '#ef4444'; signal = '🔴🔴 Strong selling';
+  } else if (ratio < 0.8 && sellPct > 55) {
+    trend = 'SELLING'; color = '#f97316'; signal = '🔴 Selling';
+  } else {
+    trend = 'NEUTRAL'; color = '#f59e0b'; signal = '⚪ Neutral';
+  }
+
+  return {
+    symbol,
+    ready: true,
+    totalTrades: trades.length,
+    totalVolume,
+    buyVolume,
+    sellVolume,
+    buyPct,
+    sellPct,
+    ratio,
+    trend,
+    color,
+    signal,
+    lastPrice: lastPrice.toFixed(2)
+  };
+}
+
+module.exports = { recordFromStocks, analyzeRatio, recordSnapshot, analyzeTickTrades };

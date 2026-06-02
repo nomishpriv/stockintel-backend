@@ -4,7 +4,7 @@
 const axios = require('axios');
 const Groq  = require('groq-sdk');
 
-const ahlService = require('./ahlResearchService');
+// const ahlService = require('./ahlResearchService');
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -70,19 +70,19 @@ const MAX_AGE_HOURS  = 6;
 
 // ─── PSX SECTOR → TICKERS ────────────────────────────────────────────────────
 const SECTOR_TICKERS = {
-  'Banking':     ['HBL', 'UBL', 'MCB', 'BAFL', 'ABL', 'MEBL'],
-  'Cement':      ['LUCK', 'DGKC', 'CHCC', 'MLCF', 'KOHC', 'FCCL'],
-  'Oil & Gas':   ['PPL', 'OGDC', 'PSO', 'SNGP', 'SSGC', 'APL'],
-  'Fertilizer':  ['ENGRO', 'FFC', 'EFERT', 'FATIMA'],
-  'Power':       ['HUBC', 'KAPCO', 'KEL', 'NCPL', 'PKGP'],
-  'Steel':       ['ASTL', 'ISL', 'MUGHAL'],
-  'Textile':     ['NML', 'NCL', 'GATM', 'GFIL'],
-  'Pharma':      ['SEARL', 'GLAXO', 'FEROZ', 'HINOON'],
-  'Tech':        ['TRG', 'SYS', 'TELE'],
-  'Auto':        ['PSMC', 'INDU', 'HCAR', 'ATLH'],
-  'Food & FMCG': ['NESTLE', 'ENGRO', 'UNITY', 'COLG'],
-  'Real Estate': ['MLCF', 'PACE', 'ARPL'],
-  'Economy':     ['KSE100'],
+  'Banking':     ['MEBL'],                           // Only Islamic bank compliant
+  'Cement':      ['LUCK', 'DGKC', 'CHCC', 'MLCF', 'KOHC', 'FCCL','LUCK'],
+  'Oil & Gas':   ['PPL', 'PSO', 'SNGP', 'SSGC', 'OGDC', 'MARI',],     // OGDC not in visible list; APL non-compliant
+  'Fertilizer':  ['EFERT', 'FFC', 'FATIMA','ENGRO'],           // ENGRO not explicitly listed
+  'Power':       ['HUBC', 'KEL'],                    // KAPCO non-compliant (17.79%), PKGP non-compliant (54.13%)
+  'Steel':       ['ISL', 'MUGHAL'],                  // ASTL non-compliant (5.27%)
+  'Textile':     ['GATM', 'GFIL','NML'],                   // NML / NCL not in verified chunks
+  'Pharma':      ['SEARL', 'GLAXO', 'FEROZ', 'HINOON','AGP'],
+  'Tech':        ['SYS', 'TELE'],                    // TRG non-compliant (100%)
+  'Auto':        ['HCAR'],                           // INDU non-compliant (3.99%), ATLH non-compliant (1.94%)
+  'Food & FMCG': ['COLG', 'UNITY'],                  // NESTLE not in Al Meezan chunks shown
+  'Chemical': ['ARPL','LOTCHEM'],           // PACE non-compliant (8.12%)
+  'Real State': ['DCR'],           // PACE non-compliant (8.12%)
 };
 
 // ─── CACHE ────────────────────────────────────────────────────────────────────
@@ -354,15 +354,17 @@ async function getNewsImpact({ forceRefresh = false } = {}) {
 
   try {
     // Fetch everything in parallel
-    const [rssResults, mettisResults, ahlResults] = await Promise.all([
+    const [rssResults, mettisResults, 
+      // ahlResults
+    ] = await Promise.all([
       Promise.all(NEWS_SOURCES.map(fetchRSS)),
       Promise.all(METTIS_APIS.map(fetchMettisAPI)),
-      ahlService.fetchAHLResearch().catch(() => []),
+      // ahlService.fetchAHLResearch().catch(() => []),
     ]);
 
     // Merge — Mettis first (higher weight/priority)
     const allItems = [
-      ...ahlResults,
+      // ...ahlResults,
       ...mettisResults.flat(),
       ...rssResults.flat(),
     ];

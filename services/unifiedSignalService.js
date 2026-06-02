@@ -256,6 +256,24 @@ async function getUnifiedSignal(symbol) {
     }
   }
 
+  // ─── TICK FLOW ───
+if (stock.tickFlow) {
+  const flow = stock.tickFlow;
+  if (flow.trend === 'STRONG_BUYING') {
+    score += 8;
+    factors.push({ text: `Tick flow: ${flow.buyPct}% buying`, weight: 8 });
+  } else if (flow.trend === 'BUYING') {
+    score += 5;
+    factors.push({ text: `Tick flow: ${flow.buyPct}% buying`, weight: 5 });
+  } else if (flow.trend === 'STRONG_SELLING') {
+    score -= 8;
+    factors.push({ text: `Tick flow: ${flow.sellVolume} sell vol`, weight: -8 });
+  } else if (flow.trend === 'SELLING') {
+    score -= 5;
+    factors.push({ text: `Tick flow: selling dominant`, weight: -5 });
+  }
+}
+
   const signal = mapSignal(score);
   const confidence = Math.min(100, Math.max(0, Math.abs(score)));
   const risk = calcRisk(stock, flowData);
