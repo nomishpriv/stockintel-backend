@@ -9,11 +9,11 @@
   },
   "dependencies": {
     "axios": "latest",
+    "cheerio": "^1.2.0",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
     "groq-sdk": "^1.2.0",
-    "node-cron": "^4.2.1",
-    "pdfreader": "^3.0.8"
+    "node-cron": "^4.2.1"
   }
 }
