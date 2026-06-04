@@ -382,7 +382,7 @@ router.get('/institutional', async (req, res) => {
 
 router.get('/results/today', async (req, res) => {
   try {
-    const data = await resultService.getTodayResultImpact('2026-06-03');
+    const data = await resultService.getTodayResultImpact();
     successRes(res, data);
   } catch (e) {
     errorRes(res, 500, e.message);
